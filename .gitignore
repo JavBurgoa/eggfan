@@ -1,1 +1,3 @@
 .outputs/
+./tests/run.sh
+./tests/genan.log

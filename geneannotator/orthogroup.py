@@ -18,7 +18,7 @@ def read_eggnog(*paths):
     for path in paths:
         eggnog = pd.read_csv(path,
                          sep='\t', 
-                         names=["X", "Orthogroup", "N_Prots", "N_Spec", "ProtID", "SpeciesID"]
+                         names=["X", "Orthogroup", "N_Prots", "N_Spec", "Protein stable ID", "SpeciesID"]
                          )
         eggnogs.append(eggnog)
 
@@ -27,6 +27,7 @@ def read_eggnog(*paths):
         return eggnogs
     else:
         return eggnogs[0]
+
 
 # This fucntion is to make a future lookup table using APIs
 def eggnog_prots_extract(eggnog, taxID):
@@ -78,72 +79,92 @@ def eggnog_orthoprot_table(eggnog, taxID, explode = True, remove_taxid = True):
     remove_taxid: boolean
         If true it will remove taxID from the prot IDs. Otherwise it will leave them with their protID
     """
+
+    prot_column = "Protein stable ID"
     prot_ortho = pd.DataFrame()
 
-    eggnog["ProtID"] = eggnog.ProtID.str.split(',')
+    eggnog[prot_column] = eggnog.loc[:, prot_column].str.split(',')
     for i in eggnog.index.values:
-        prot = [x for x in eggnog.loc[i, "ProtID"] if x.startswith(taxID)]
+        prot = [x for x in eggnog.loc[i, prot_column] if x.startswith(taxID)]
         if len(prot) > 0:
             prot = ",".join(prot)            
-            prot = pd.DataFrame(data = {"Orthogroup":[eggnog.loc[i, "Orthogroup"]], "ProtID": [prot]})
+            prot = pd.DataFrame(data = {"Orthogroup":[eggnog.loc[i, "Orthogroup"]], prot_column: [prot]})
             prot_ortho = prot_ortho.append(prot, ignore_index = True)
     
     prot_ortho.drop_duplicates(inplace = True)
 
     if remove_taxid:
-        prot_ortho.ProtID = prot_ortho.ProtID.str.replace(taxID + ".", "", regex=False)
+        prot_ortho.loc[:, prot_column] = prot_ortho.loc[:, prot_column].str.replace(taxID + ".", "", regex=False)
 
     if explode:
-        prot_ortho.ProtID = prot_ortho.ProtID.str.split(",")
-        prot_ortho = prot_ortho.explode("ProtID")
+        prot_ortho.loc[:, prot_column] = prot_ortho.loc[:, prot_column].str.split(",")
+        prot_ortho.loc[:, prot_column] = prot_ortho.loc[:, prot_column].explode(prot_column)
 
     return prot_ortho
 
 
-def egg_translate(eggnog, lookup, taxID = "9606", merge = True):
+def egg_translate(eggnog, lookup, taxID = "9606", suffixes = False):
     """
     Takes in one or several Eggnog database raw datasets , finds each of the human proteins in it and creates a translates each one of them to Ensembl Gen IDs and HGNC symbols.
-    the output is a dataframe with all human genIDs in Eggnog, their HGNC conversion and their orthogroup for all eggnog tax levels chosen
-    This process takes around 20 minutes per eggnog dataset, so it is recommended to output this information in a desired folder, to avoid repeating this process
+    the output is a dataframe with all human genIDs in Eggnog, their HGNC conversion and their orthogroup for all eggnog tax levels chosen.
+    3 possible inputs/outputs:
+        - A single eggnog dataset / a single tranlated table
+        - An list with multiple datasets + merge argument / A single translated tabe with a orthorgoup column per eggnog database
+        - An list with multiple datasets + no merge argument / An list with a tranlated table per eggnog dataset introduced
     ...
 
     Attributes
     ----------
-    eggnog : array
-        Array containing one or more eggnog datasets in pandas dataframe format.
+    eggnog : list
+        list containing one or more eggnog datasets in pandas dataframe format.
     lookup : pandas.dataframe
         DataFrame containing three columns: "HGNC symbol", "Gene stable ID", "Protein stable ID". Each column contain strings with ID conversions from HGNC to Ensembl GenID to Ensembl protein ID
-    merge : boolean
-        if true, when having more than one eggnog database, it will merge all dataframes by protein ID (keeping all data from all datasets). Otherwise it outputs an array with each separated ttranslated table.
+    suffixes : list
+        list containing a string per eggnog dataset. When having more than one eggnog database, if there is a list, it will merge all dataframes by protein ID (keeping all data from all datasets) and adding the suffixes in the list to the orthorgoups column. If nothing specified merging will not happen
     """
 
-    
+    prot_column = "Protein stable ID"
+
     # Data preparation
     if not isinstance(eggnog, list):
         eggnog = [eggnog]
 
     for df in list(range(len(eggnog))):
         eggnog[df] = eggnog[df][eggnog[df].SpeciesID.str.contains(taxID)] # only rows with human prots stay.
-        eggnog[df].drop(columns=["SpeciesID", "X", "N_Prots", "N_Spec"], inplace=True)
+        eggnog[df] = eggnog[df].loc[:, [prot_column, "Orthogroup"]]
 
-    lookup.dropna(subset=['Protein stable ID', "Gene stable ID"], inplace=True)
+    lookup.dropna(subset=[prot_column, "Gene stable ID"], inplace=True)
 
 
     ## Make translated table(s)
     dfs = []
     for egg in eggnog:
         egg_prots = eggnog_orthoprot_table(eggnog = egg, taxID = taxID)
-        egg_prots = egg_prots.merge(lookup, how = "left", right_on = "Protein stable ID", left_on="ProtID")
+        egg_prots = egg_prots.merge(lookup, how = "left", on = prot_column)
         dfs.append(egg_prots)
-    
+
+    # Save
+    out = dfs[0]
     if len(dfs) > 1:
-        #Iterative merge
-    else: dfs = dfs[0]
+        if isinstance(suffixes, list):
+            for df in dfs[1:]:
+                df = df.drop(columns = ["HGNC symbol", "Gene stable ID"])
+                out = out.merge(df, on = prot_column, suffixes = suffixes)
+        else: out = dfs
 
-    return dfs
+    return out
 
 
+
+
+
+
+
+
+
+
+## Script
 eggnog = read_eggnog('/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Eggnog_Bilateria(33213)_members.tsv', '/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Eggnog_Metazoa(33208)_members.tsv')
 lookup = pd.read_csv('/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Biomart_Lookup_Prot-HGNC-Gen_Translate_Updated.txt', sep='\t')
 
-print(egg_translate(eggnog, lookup))
+print(egg_translate(eggnog, lookup, suffixes = ["Bilatera", "Metazoa"]))
