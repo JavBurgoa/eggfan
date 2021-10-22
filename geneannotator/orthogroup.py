@@ -105,22 +105,22 @@ def eggnog_orthoprot_table(eggnog, taxID, explode = True, remove_taxid = True):
 
 def egg_translate(eggnog, lookup, taxID = "9606", suffixes = False):
     """
-    Takes in one or several Eggnog database raw datasets , finds each of the human proteins in it and creates a translates each one of them to Ensembl Gen IDs and HGNC symbols.
-    the output is a dataframe with all human genIDs in Eggnog, their HGNC conversion and their orthogroup for all eggnog tax levels chosen.
-    3 possible inputs/outputs:
-        - A single eggnog dataset / a single tranlated table
-        - An list with multiple datasets + merge argument / A single translated tabe with a orthorgoup column per eggnog database
-        - An list with multiple datasets + no merge argument / An list with a tranlated table per eggnog dataset introduced
+    Takes in one or several Eggnog database raw datasets , finds each of the proteins in each eggnog dataset and creates a table specifying for each protein their respective Ensembl gene ID, HGNC symbol (HGNC and Ensembl gen ID may not be "translated", Na for empty values) and orthogroup.
     ...
 
     Attributes
     ----------
-    eggnog : list
-        list containing one or more eggnog datasets in pandas dataframe format.
+    eggnog : list or pandas dataframe
+        list containing one or more eggnog datasets in pandas dataframe format or a single pandas dataframe. Supposed to be direct output from read_eggnog.
     lookup : pandas.dataframe
         DataFrame containing three columns: "HGNC symbol", "Gene stable ID", "Protein stable ID". Each column contain strings with ID conversions from HGNC to Ensembl GenID to Ensembl protein ID
     suffixes : list
-        list containing a string per eggnog dataset. When having more than one eggnog database, if there is a list, it will merge all dataframes by protein ID (keeping all data from all datasets) and adding the suffixes in the list to the orthorgoups column. If nothing specified merging will not happen
+        Only should be added if inputting more than one eggnog dataset (in a list). List containing a string per eggnog dataset. When having more than one eggnog database, if there is a list, it will merge all dataframes by protein ID (keeping all data from all datasets) and adding the suffixes in the list to the orthorgoups column. If nothing specified merging will not happen
+    
+    Output
+    ------
+    - If input is a single eggnog dataset the output is a single table 
+    - If input is a list with multiple eggnog datasets + suffixes argument then the output is a single table with an extra column per dataset specifying orthorgoups from the differnt datasets inputed
     """
 
     prot_column = "Protein stable ID"
@@ -146,16 +146,60 @@ def egg_translate(eggnog, lookup, taxID = "9606", suffixes = False):
     # Save
     out = dfs[0]
     if len(dfs) > 1:
-        if isinstance(suffixes, list):
-            for df in dfs[1:]:
-                df = df.drop(columns = ["HGNC symbol", "Gene stable ID"])
-                out = out.merge(df, on = prot_column, suffixes = suffixes)
-        else: out = dfs
-
+        for df in dfs[1:]:
+            df = df.drop(columns = ["HGNC symbol", "Gene stable ID"])
+            out = out.merge(df, on = prot_column, suffixes = suffixes)
     return out
 
 
 
+def translated_QC(translated_eggnog, query = False, match_column = "Gene stable ID"):
+    ortho_cols = [colname for colname in translated_eggnog.columns.values if colname.startswith("Orthogroup")]
+
+    translated_eggnog = translated_eggnog.drop(columns = ortho_cols)
+    lost = translated_eggnog.loc[translated_eggnog[match_column].isna(), :]
+    lost_prots = lost["Protein stable ID"]
+    print("Proteins thatwere in eggnog but were not translated:")
+    print(lost_prots)
+
+    if query is not False:
+        query.columns = [match_column]
+        query = np.array(query[match_column])
+        print("Genes from your query that are not translated or were not in eggnog database:")
+        lost_genes = np.array(lost[match_column])
+        print(query[np.isin(query, lost_genes)])
+
+
+
+
+
+def merge_with_query(translated_eggnog, query, merge_on = "Gene stable ID", keep_conversions = False):
+    """
+    Subset your genes of interest (query) from the translated_eggnog table. Outputs all orthogroups for your genes of interest + (if keep_conversions = True) conversions to other symbols
+    ...
+
+    Attributes
+    ----------
+    translated_eggnog: pandas dataframe
+        Product of egg_translate with one or more eggnog datasets.
+    query: pandas dataframe
+        Dataframe containing a single row with Genes or proteins in ID format matching any column in translated_eggnog (Ensembl GenIDs, Ensebl Protein IDs, or HGNC symbols)
+    merge_on: string
+        String with the name of the column in lookup and traslated_eggnog you want to merge. Default: By Ensembl Gen IDs
+    keep_conversions: boolean
+        Wether to keep the rest of the translations of the genes (HGNC, Ensembl Gene ID and Ensembl Protein ID)
+    """
+    query.columns = [merge_on]
+    query_with_orth = translated_eggnog.merge(query, how = "right", on = merge_on)
+    ortho_cols = [colname for colname in query_with_orth.columns.values if colname.startswith("Orthogroup")]
+    query_with_orth.dropna(subset=ortho_cols, inplace = True)
+
+    if not keep_conversions:
+        columns_keep = ortho_cols + [merge_on]
+        print(columns_keep)
+        query_with_orth = query_with_orth.loc[:, columns_keep]
+
+    return query_with_orth
 
 
 
@@ -163,8 +207,12 @@ def egg_translate(eggnog, lookup, taxID = "9606", suffixes = False):
 
 
 
-## Script
+## Script I would put in a differnt file to make the final main function
 eggnog = read_eggnog('/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Eggnog_Bilateria(33213)_members.tsv', '/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Eggnog_Metazoa(33208)_members.tsv')
 lookup = pd.read_csv('/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Biomart_Lookup_Prot-HGNC-Gen_Translate_Updated.txt', sep='\t')
+query = pd.read_csv("/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/TFs_Ensembl_v_1.01.txt", sep = "\t")
 
-print(egg_translate(eggnog, lookup, suffixes = ["Bilatera", "Metazoa"]))
+
+translated_eggnog = egg_translate(eggnog, lookup, suffixes = ["Bilatera", "Metazoa"])
+translated_QC(translated_eggnog, query)
+query_orthogroups= merge_with_query(translated_eggnog, query, merge_on = "Gene stable ID", keep_conversions= True)
