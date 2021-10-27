@@ -62,6 +62,51 @@ def eggnog_prots_extract(eggnog, taxID):
 
     return all_proteins
 
+def query_table(dataset, match_column, taxID, data_origin):
+	"""
+    Takes in a table with two columns, one of them with unique identifiers and the other with multiple identifiers separated y commas as:
+    | protein | Orthogroup                        |
+    | ENSP01  | GHFC@metaz, GBHF@metaz, GFCB@Opis |
+    | ENSP02  | FVHG@Bilate, HJHG@Opis, HGNJ@Phot |
+
+    And an id that identifies some of the multiple identifiers (Orthogroup columns in this example). It reduces the table size by picking only row that contain the id
+    and removes all identifiers that do not contain the id. thus for the id = metaz we would get:
+
+    | protein | Orthogroup            |
+    | ENSP01  | GHFC@metaz, GBHF@metaz|
+
+    Attributes
+    ----------
+    dataset: pandas dataframe
+    	table with two columns as explained in the documentation above. It is relevant that one of the columns contains unique identifiers and the other multiple.
+    match_column: string
+    	name of the column with the multiple identifiers where we want to match the taxID
+    taxID: string
+    	substring, present in the match_column column. All identifiers without the TaxID will be eliminated
+    data_origin: string
+    	can take values "emapper" or "eggnog", depending on whether we want to do this on a dataset downloaded from eggnog or the output of emapper. emapper input is usually two columns, one
+    	with protein IDs from the target species ("#query") column and one with all orthorgoups from that protein separated by ",". eggnog is simmilar, one column with one orthorgoup per row and another one
+    	with several proteins, separated one from another by ",".
+    """
+	draged_column = [colname for colname in dataset.columns.values if colname != match_column][0]
+	if isinstance(dataset.loc[0, match_column], str): # This is a patch. when using this function in a loop like emaper_annotation() the original emapper object gets modified by this line the first time. If you do it again you get NAs. I don't know why this happens
+		dataset.loc[:, match_column] = dataset.loc[:, match_column].str.split(',')
+	out = pd.DataFrame()
+
+	for i in dataset.index.values:
+		if data_origin == "emapper": # not very efficient evaluating for every row
+			matched_element = [element for element in dataset.loc[i, match_column] if taxID in element]
+		elif data_origin == "eggnog":
+			matched_element = [element for element in dataset.loc[i, match_column] if element.startswith(taxID)]
+
+		if len(matched_element) > 0:
+			matched_element = ",".join(matched_element)
+			matched_element = pd.DataFrame(data = {draged_column:[dataset.loc[i, draged_column]], match_column : [matched_element]})
+			out = out.append(matched_element, ignore_index = True)
+
+	return(out)
+
+
 
 def eggnog_orthoprot_table(eggnog, taxID, explode = True, remove_taxid = True):
     """
@@ -81,18 +126,12 @@ def eggnog_orthoprot_table(eggnog, taxID, explode = True, remove_taxid = True):
     """
 
     prot_column = "Protein stable ID"
-    prot_ortho = pd.DataFrame()
 
-    eggnog[prot_column] = eggnog.loc[:, prot_column].str.split(',')
-    for i in eggnog.index.values:
-        prot = [x for x in eggnog.loc[i, prot_column] if x.startswith(taxID)]
-        if len(prot) > 0:
-            prot = ",".join(prot)            
-            prot = pd.DataFrame(data = {"Orthogroup":[eggnog.loc[i, "Orthogroup"]], prot_column: [prot]})
-            prot_ortho = prot_ortho.append(prot, ignore_index = True)
+    prot_ortho = query_table(eggnog, match_column = prot_column, taxID = "9606", data_origin = "eggnog")
     
     prot_ortho.drop_duplicates(inplace = True)
 
+    # Return
     if remove_taxid:
         prot_ortho.loc[:, prot_column] = prot_ortho.loc[:, prot_column].str.replace(taxID + ".", "", regex=False)
 
@@ -103,7 +142,7 @@ def eggnog_orthoprot_table(eggnog, taxID, explode = True, remove_taxid = True):
     return prot_ortho
 
 
-def egg_translate(eggnog, lookup, taxID = "9606", suffixes = False):
+def egg_translate(eggnog, lookup, taxID = "9606"):
     """
     Takes in one or several Eggnog database raw datasets , finds each of the proteins in each eggnog dataset and creates a table specifying for each protein their respective Ensembl gene ID, HGNC symbol (HGNC and Ensembl gen ID may not be "translated", Na for empty values) and orthogroup.
     ...
@@ -114,13 +153,11 @@ def egg_translate(eggnog, lookup, taxID = "9606", suffixes = False):
         list containing one or more eggnog datasets in pandas dataframe format or a single pandas dataframe. Supposed to be direct output from read_eggnog.
     lookup : pandas.dataframe
         DataFrame containing three columns: "HGNC symbol", "Gene stable ID", "Protein stable ID". Each column contain strings with ID conversions from HGNC to Ensembl GenID to Ensembl protein ID
-    suffixes : list
-        Only should be added if inputting more than one eggnog dataset (in a list). List containing a string per eggnog dataset. When having more than one eggnog database, if there is a list, it will merge all dataframes by protein ID (keeping all data from all datasets) and adding the suffixes in the list to the orthorgoups column. If nothing specified merging will not happen
     
     Output
     ------
     - If input is a single eggnog dataset the output is a single table 
-    - If input is a list with multiple eggnog datasets + suffixes argument then the output is a single table with an extra column per dataset specifying orthorgoups from the differnt datasets inputed
+    - If input is a list with multiple eggnog datasets then the output is a single table with an extra column per dataset specifying orthogroups from the differnt datasets inputed
     """
 
     prot_column = "Protein stable ID"
@@ -129,12 +166,15 @@ def egg_translate(eggnog, lookup, taxID = "9606", suffixes = False):
     if not isinstance(eggnog, list):
         eggnog = [eggnog]
 
+    tax_levels = []
     for df in list(range(len(eggnog))):
+        tax = "@" + str(eggnog[df].iat[0,0])
+        tax_levels.append(tax) # For later use in naming orthogroup columns
+
         eggnog[df] = eggnog[df][eggnog[df].SpeciesID.str.contains(taxID)] # only rows with human prots stay.
         eggnog[df] = eggnog[df].loc[:, [prot_column, "Orthogroup"]]
 
     lookup.dropna(subset=[prot_column, "Gene stable ID"], inplace=True)
-
 
     ## Make translated table(s)
     dfs = []
@@ -148,7 +188,7 @@ def egg_translate(eggnog, lookup, taxID = "9606", suffixes = False):
     if len(dfs) > 1:
         for df in dfs[1:]:
             df = df.drop(columns = ["HGNC symbol", "Gene stable ID"])
-            out = out.merge(df, on = prot_column, suffixes = suffixes)
+            out = out.merge(df, on = prot_column, suffixes = tax_levels)
     return out
 
 
@@ -159,7 +199,7 @@ def translated_QC(translated_eggnog, query = False, match_column = "Gene stable 
     translated_eggnog = translated_eggnog.drop(columns = ortho_cols)
     lost = translated_eggnog.loc[translated_eggnog[match_column].isna(), :]
     lost_prots = lost["Protein stable ID"]
-    print("Proteins thatwere in eggnog but were not translated:")
+    print("Proteins that were in eggnog but were not translated:")
     print(lost_prots)
 
     if query is not False:
@@ -196,23 +236,86 @@ def merge_with_query(translated_eggnog, query, merge_on = "Gene stable ID", keep
 
     if not keep_conversions:
         columns_keep = ortho_cols + [merge_on]
-        print(columns_keep)
         query_with_orth = query_with_orth.loc[:, columns_keep]
 
     return query_with_orth
 
+def format_qer_orth(query_orthogroups, ortho_cols):
+	"""
+	query_orthogroups has each orthogroup in a separate column. This script puts eveything in a single "Orthogroup" column, adding the @tax_ID to each orthogroup.
 
+	Attributes
+    ----------
+    query_orthogroups: pandas dataframe
+		Pandas dataframe with genes from query list, their conversions and orthogroups they belong to (in separate columns)
+	ortho_cols: array
+		Names of columns that contain the orthogroups 
+	"""
+	non_ortho_cols = [element for element in query_orthogroups.columns.values if element not in ortho_cols ]
+	out = pd.DataFrame()
+
+	for col in ortho_cols:
+		# Make dataframe with only one Ortho column but all gene names and conversions
+		non_ortho_cols = [element for element in query_orthogroups.columns.values if element not in ortho_cols ]
+		subset = non_ortho_cols
+		subset.append(col)
+		new_query_orth = query_orthogroups.loc[:, subset]
+
+		# Add @ taxID to orthogroups
+		orthoname = col.replace("Orthogroup", "")
+		new_query_orth.loc[:, col] = new_query_orth.loc[:, col] + orthoname
+
+		new_query_orth.columns = ["Orthogroup" if element==col else element for element in subset] # we rename Orthogroup column to just "Orthorgoup" for future append
+		out = out.append(new_query_orth)
+	
+	out = out.reset_index()
+	
+	return out
+
+
+def emapper_annotation(emapper, query_orthogroups):
+	'''
+	This function takes in emapper results and a pre-created dataframe wth the original querys and their respective orthogroups
+	and combines them to output a list with all genes that share orthogroup with your query genes.
+	'''
+
+
+	match_column = "eggNOG_OGs"
+	ortho_cols = [colname for colname in query_orthogroups.columns.values if colname.startswith("Orthogroup")]
+	targets_with_orthogroups = pd.DataFrame()
+	
+	emapper = emapper[["#query", "eggNOG_OGs"]]
+	emapper.dropna(inplace = True) # remove last three lines with emapper run data. The rest have "-" instead of NAs so we are not loosing anything
+
+	# Find othogroups matches between query_orthogroups and all of the genes of our target species
+	for col in ortho_cols:
+		tax_level = col.replace("Orthogroup", "")
+		subsetted_emapper = query_table(emapper, match_column = match_column, taxID = tax_level, data_origin = "emapper")
+		targets_with_orthogroups = targets_with_orthogroups.append(subsetted_emapper)
+
+	# We have query_orthogroups with all orthorgoups of our curated list, and targets_with... with all target genes that have an rthorgoup in the same level at least
+	# We merge them
+
+	query_orthogroups = format_quer_orth(query_orthogroups, ortho_cols)
+	query_orthogroups.merge(targets_with_orthogroups, how = "left", )
+
+	return(allTFs)
 
 
 
 
 
 ## Script I would put in a differnt file to make the final main function
+# Import data
 eggnog = read_eggnog('/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Eggnog_Bilateria(33213)_members.tsv', '/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Eggnog_Metazoa(33208)_members.tsv')
 lookup = pd.read_csv('/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Biomart_Lookup_Prot-HGNC-Gen_Translate_Updated.txt', sep='\t')
 query = pd.read_csv("/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/TFs_Ensembl_v_1.01.txt", sep = "\t")
+emapper = pd.read_csv("/g/arendt/Javier/Python/TF_annot_methods/Capitella_teleta/Data/Capitella_teleta_Prot_emapper_annotations.txt", skiprows=4, sep="\t")
 
 
-translated_eggnog = egg_translate(eggnog, lookup, suffixes = ["Bilatera", "Metazoa"])
-translated_QC(translated_eggnog, query)
-query_orthogroups= merge_with_query(translated_eggnog, query, merge_on = "Gene stable ID", keep_conversions= True)
+# make |query - orthogroup| table
+translated_eggnog = egg_translate(eggnog, lookup)
+#translated_QC(translated_eggnog, query)
+query_orthogroups = merge_with_query(translated_eggnog, query, merge_on = "Gene stable ID", keep_conversions= True)
+# Get query orthogroup matching from target species genes
+print(emapper_annotation(emapper, query_orthogroups))
