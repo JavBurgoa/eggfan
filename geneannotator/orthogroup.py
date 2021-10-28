@@ -128,7 +128,6 @@ def eggnog_orthoprot_table(eggnog, taxID, explode = True, remove_taxid = True):
     prot_column = "Protein stable ID"
 
     prot_ortho = query_table(eggnog, match_column = prot_column, taxID = "9606", data_origin = "eggnog")
-    
     prot_ortho.drop_duplicates(inplace = True)
 
     # Return
@@ -137,7 +136,7 @@ def eggnog_orthoprot_table(eggnog, taxID, explode = True, remove_taxid = True):
 
     if explode:
         prot_ortho.loc[:, prot_column] = prot_ortho.loc[:, prot_column].str.split(",")
-        prot_ortho.loc[:, prot_column] = prot_ortho.loc[:, prot_column].explode(prot_column)
+        prot_ortho = prot_ortho.explode(prot_column)
 
     return prot_ortho
 
@@ -240,7 +239,7 @@ def merge_with_query(translated_eggnog, query, merge_on = "Gene stable ID", keep
 
     return query_with_orth
 
-def format_qer_orth(query_orthogroups, ortho_cols):
+def format_quer_orth(query_orthogroups, ortho_cols):
 	"""
 	query_orthogroups has each orthogroup in a separate column. This script puts eveything in a single "Orthogroup" column, adding the @tax_ID to each orthogroup.
 
@@ -272,8 +271,38 @@ def format_qer_orth(query_orthogroups, ortho_cols):
 	
 	return out
 
+def format_query_targets(query_targets):
+	group_by_col = "#query"
+	non_query_cols = [colname for colname in query_targets.columns.values if not colname == group_by_col]
 
-def emapper_annotation(emapper, query_orthogroups):
+	tab_separated = query_targets.groupby(["#query", "Orthogroup"])[["Gene stable ID", "HGNC symbol", "Protein stable ID"][0]].apply("|".join).reset_index()
+	for col in ["Gene stable ID", "HGNC symbol", "Protein stable ID"][1:]:
+		subset = query_targets.groupby(["#query", "Orthogroup"])[col].apply("|".join).reset_index()
+		tab_separated[col] = subset.loc[:, col]
+
+	out = tab_separated.groupby([group_by_col])[non_query_cols[0]].apply(",".join).reset_index()
+	for col in non_query_cols[1:]:
+		subset = tab_separated.groupby([group_by_col])[col].apply(",".join).reset_index()
+		out = subset.merge(out, how = "outer", on = group_by_col)
+
+	return out 
+
+	'''
+	group_by_col = "#query"
+	non_query_cols = [colname for colname in query_targets.columns.values if not colname == group_by_col]
+
+	out = query_targets.groupby([group_by_col])[non_query_cols[0]].apply(",".join).reset_index()
+	for col in non_query_cols[1:]:
+		subset = query_targets.groupby([group_by_col])[col].apply(",".join).reset_index()
+		out = subset.merge(out, how = "outer", on = group_by_col)
+
+	return out 
+	'''
+
+
+
+
+def emapper_annotation(emapper, query_orthogroups, keep_all_targets = True):
 	'''
 	This function takes in emapper results and a pre-created dataframe wth the original querys and their respective orthogroups
 	and combines them to output a list with all genes that share orthogroup with your query genes.
@@ -292,14 +321,20 @@ def emapper_annotation(emapper, query_orthogroups):
 		tax_level = col.replace("Orthogroup", "")
 		subsetted_emapper = query_table(emapper, match_column = match_column, taxID = tax_level, data_origin = "emapper")
 		targets_with_orthogroups = targets_with_orthogroups.append(subsetted_emapper)
-
+	
+	targets_with_orthogroups[match_column] = targets_with_orthogroups[match_column].str.replace("\|.*$", "", regex = True)
+	
 	# We have query_orthogroups with all orthorgoups of our curated list, and targets_with... with all target genes that have an rthorgoup in the same level at least
 	# We merge them
-
 	query_orthogroups = format_quer_orth(query_orthogroups, ortho_cols)
-	query_orthogroups.merge(targets_with_orthogroups, how = "left", )
+	query_targets= query_orthogroups.merge(targets_with_orthogroups, how = "right", left_on="Orthogroup", right_on=match_column)
+	query_targets = query_targets.drop(columns = [match_column, "index"])
+	if not keep_all_targets:
+		query_targets = query_targets.dropna()
 
-	return(allTFs)
+	out = format_query_targets(query_targets)
+
+	return out
 
 
 
@@ -318,4 +353,5 @@ translated_eggnog = egg_translate(eggnog, lookup)
 #translated_QC(translated_eggnog, query)
 query_orthogroups = merge_with_query(translated_eggnog, query, merge_on = "Gene stable ID", keep_conversions= True)
 # Get query orthogroup matching from target species genes
-print(emapper_annotation(emapper, query_orthogroups))
+annotated_genes = emapper_annotation(emapper, query_orthogroups, keep_all_targets= False)
+annotated_genes.to_csv("/g/arendt/Javier/Python/geneannotator/tests/Ortho_method_Capitella_TFs.tsv", sep = "\t")
