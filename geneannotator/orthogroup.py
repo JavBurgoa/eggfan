@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
+pd.options.mode.chained_assignment = None  # default='warn'
 
 
 
-
-def read_eggnog(*paths):
+def read_eggnog(paths):
     """
     Read and format one or many eggnog datasets for posterior uses by further functions. Formatting consists of adding column names
     ...
@@ -193,6 +193,22 @@ def egg_translate(eggnog, lookup, taxID = "9606"):
 
 
 def translated_QC(translated_eggnog, query = False, match_column = "Gene stable ID"):
+    """
+    Makes a quality control of the translated eggnog file. This QC simply shows you which proteins in the eggnog database were not translated, and therefore will not b used further nd will be lost
+    If adding a file with Curated GenIDs, it tells you which genes of your list were not translated o were not in the ggnog databse at all. If you find any of yur Curated genes is outputted by this function
+    You should go check in the eggnog database wether this isbecause your gene wasn't in the database at all (in which case, nothing should be done) or your gene was in the eggnog database but was not translated, in which case
+    the lookup should be updated to account for that otherwise lost gene. Genes can be lost because the protein IDs in Eggnog are sometimes outdated. 
+    ...
+
+    Attributes
+    ----------
+    translated_eggnog : pandas dataframe
+    	Output of egg_translate(). A dataframe with all eggnog proteins and their respective conversions. If there was no conversion: NA.        
+    query (optional): pandas.dataframe
+        DataFrame a single column with the ID format to whihc the eggnog proteins were translated
+    match_column: string
+    	Name of the column with the translated IDs. In other words, the name of the column that will later be used to make the match with the query list.
+    """
     ortho_cols = [colname for colname in translated_eggnog.columns.values if colname.startswith("Orthogroup")]
 
     translated_eggnog = translated_eggnog.drop(columns = ortho_cols)
@@ -204,7 +220,7 @@ def translated_QC(translated_eggnog, query = False, match_column = "Gene stable 
     if query is not False:
         query.columns = [match_column]
         query = np.array(query[match_column])
-        print("Genes from your query that are not translated or were not in eggnog database:")
+        print("Genes **from your query** that are not translated or were not in eggnog database (Any gene here belongs to your query but will not be used for the analysis):")
         lost_genes = np.array(lost[match_column])
         print(query[np.isin(query, lost_genes)])
 
@@ -264,7 +280,7 @@ def format_quer_orth(query_orthogroups, ortho_cols):
 		orthoname = col.replace("Orthogroup", "")
 		new_query_orth.loc[:, col] = new_query_orth.loc[:, col] + orthoname
 
-		new_query_orth.columns = ["Orthogroup" if element==col else element for element in subset] # we rename Orthogroup column to just "Orthorgoup" for future append
+		new_query_orth.columns = ["Orthogroup" if element==col else element for element in subset] # we rename Orthogroup column to just "Orthogroup" for future append
 		out = out.append(new_query_orth)
 	
 	out = out.reset_index()
@@ -272,6 +288,27 @@ def format_quer_orth(query_orthogroups, ortho_cols):
 	return out
 
 def format_query_targets(query_targets):
+	"""
+	This function takes a table in long format, with all geneID conversions, orthogroups and target geenes in seàrate columns and collapses the rows:
+	Before:
+	#query	| Orthogroup  | Gene stable ID | HGNC symbol | Protein stable ID
+	Capte12 | GFBCH@Metaz | ENSG00001      | PIP1        | ENSP00001
+	Capte12 | GFBCH@Metaz | ENSG00002      | PIP2        | ENSP00002
+	Capte12 | GFBCH@Metaz | ENSG00003      | PIP3        | ENSP00003
+	Capte12 | TRFCC@Bilat | ENSG00001      | PIP1        | ENSP00001
+	Capte12 | TRFCC@Bilat | ENSG00003      | PIP3        | ENSP00003
+	Capte56 | TRFCC@Bilat | ENSG00005      | CAC2        | ENSP00005
+	Capte56 | TRFCC@Bilat | ENSG00006      | CAC1        | ENSP00006
+	Capte80 | CDFCD@Metaz | ENSG00009      | ZEP1        | ENSP00009
+	Capte80 | UUIJO@Bilat | ENSG00007      | ASACA       | ENSP00007	
+
+	After:
+	Capte12 | GFBCH@Metaz,TRFCC@Bilat | ENSG00001|ENSG00002|ENSG00003,ENSG00001|ENSG00003 | PIP1|PIP2|PIP3,PIP1|PIP3 | ENSP00001|ENSP00002|ENSP00003,ENSP00001|ENSP00003
+	Capte56 | TRFCC@Bilat 			  | ENSG00005|ENSG00006                               | CAC2|CAC1                | ENSP00005|ENSP00006
+	Capte80 | CDFCD@Metaz,UUIJO@Bilat | ENSG00009,ENSG00007                               | ZEP1,ASACA               | ENSP00009,ENSP00007
+	
+	All information is kept. GeneIDs, HGNCs, and ProteiIDs belonging to a unique Orthogroup are separated by "|", if belonging to differnt Orthogroups, separated by ",".
+	"""
 	group_by_col = "#query"
 	non_query_cols = [colname for colname in query_targets.columns.values if not colname == group_by_col]
 
@@ -287,27 +324,23 @@ def format_query_targets(query_targets):
 
 	return out 
 
-	'''
-	group_by_col = "#query"
-	non_query_cols = [colname for colname in query_targets.columns.values if not colname == group_by_col]
-
-	out = query_targets.groupby([group_by_col])[non_query_cols[0]].apply(",".join).reset_index()
-	for col in non_query_cols[1:]:
-		subset = query_targets.groupby([group_by_col])[col].apply(",".join).reset_index()
-		out = subset.merge(out, how = "outer", on = group_by_col)
-
-	return out 
-	'''
-
 
 
 
 def emapper_annotation(emapper, query_orthogroups, keep_all_targets = True):
 	'''
-	This function takes in emapper results and a pre-created dataframe wth the original querys and their respective orthogroups
-	and combines them to output a list with all genes that share orthogroup with your query genes.
-	'''
+	This function takes in emapper results and a pre-created dataframe with the original querys and their respective orthogroups
+	and combines them to output a list with all genes that share orthogroup with your query genes. This is, what genes of your emapper search share orthogroup with your curated list of genes.
 
+	Attributes
+	----------
+	emapper: pandas dataframe
+		emapper's output read by pandas, after removing the first 4 rows (metadata) with read_csv(skiprows = 4)
+	query_orthogroups: pandas dataframe
+		dataframe with all of your curated genes, their conversions to other IDs and their orthogroups. One orthogroup per row, so genes are duplicated (one gene can belong to multiple orthogroups)
+	keep_all_targets: Boolean
+		Whether to keep all target genes (from emapper) wether they share orthorgoup with your query (curated list) or not.
+	'''
 
 	match_column = "eggNOG_OGs"
 	ortho_cols = [colname for colname in query_orthogroups.columns.values if colname.startswith("Orthogroup")]
@@ -339,8 +372,8 @@ def emapper_annotation(emapper, query_orthogroups, keep_all_targets = True):
 
 
 
-
-## Script I would put in a differnt file to make the final main function
+"""
+## Script if you want to run it manually
 # Import data
 eggnog = read_eggnog('/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Eggnog_Bilateria(33213)_members.tsv', '/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Eggnog_Metazoa(33208)_members.tsv')
 lookup = pd.read_csv('/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Biomart_Lookup_Prot-HGNC-Gen_Translate_Updated.txt', sep='\t')
@@ -350,8 +383,9 @@ emapper = pd.read_csv("/g/arendt/Javier/Python/TF_annot_methods/Capitella_teleta
 
 # make |query - orthogroup| table
 translated_eggnog = egg_translate(eggnog, lookup)
-#translated_QC(translated_eggnog, query)
+translated_QC(translated_eggnog, query)
 query_orthogroups = merge_with_query(translated_eggnog, query, merge_on = "Gene stable ID", keep_conversions= True)
 # Get query orthogroup matching from target species genes
 annotated_genes = emapper_annotation(emapper, query_orthogroups, keep_all_targets= False)
 annotated_genes.to_csv("/g/arendt/Javier/Python/geneannotator/tests/Ortho_method_Capitella_TFs.tsv", sep = "\t")
+"""
