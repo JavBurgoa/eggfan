@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-pd.options.mode.chained_assignment = None  # default='warn'
+pd.options.mode.chained_assignment = None  # default='warn', otherwie it gives anoying warnings of not using .loc in pandas
 
 
 
@@ -222,7 +222,7 @@ def translated_QC(translated_eggnog, query = False, match_column = "Gene stable 
         query = np.array(query[match_column])
         print("Genes **from your query** that are not translated or were not in eggnog database (Any gene here belongs to your query but will not be used for the analysis):")
         lost_genes = np.array(lost[match_column])
-        print(query[np.isin(query, lost_genes)])
+        print(query[np.isin(query, lost_genes)].to_csv(sep='\t', index=False))
 
 
 

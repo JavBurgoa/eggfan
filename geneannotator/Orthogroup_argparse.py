@@ -28,7 +28,7 @@ emapper = pd.read_csv(args.emapper, skiprows=4, sep="\t")
 ## Run pipeline
 # translate eggnog Protein ENSEMBL IDs to whatever you want (default and recommended, ENSEMBL gene IDs)
 translated_eggnog = orthogroup.egg_translate(eggnog, lookup)
-print("* Eggnog files read")
+#print("* Eggnog files read")
 
 # QC
 if args.QC:
@@ -41,7 +41,7 @@ if args.remove_conversions:
 else: keep_conversions = True
 
 query_orthogroups = orthogroup.merge_with_query(translated_eggnog, query, merge_on = args.merge_on, keep_conversions= keep_conversions)
-print("* All files read and Query - Orthogroup table made")
+#print("* All files read and Query - Orthogroup table made")
 
 # Match my query genes' orthorgoups with my proteome emapper orthogroups
 if args.keep_all_targets:
@@ -51,4 +51,4 @@ annotated_genes = orthogroup.emapper_annotation(emapper, query_orthogroups, keep
 
 
 # Output
-print(annotated_genes)
+print(annotated_genes.to_csv(sep='\t', index=False))
