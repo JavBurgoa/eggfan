@@ -360,6 +360,27 @@ def find_query_orthologs(query_path, translated_orthologies):
 
 	return tables
 
+def save_annotated(annotated_tables, directory, suffix = "_annotated_orthology"):
+	"""
+	Saves a list of dataframes into separate dataframes with specific names
+
+	Attributes
+	----------
+	annotated_tables: list
+		list containing all dataframes to be saved
+	directory: string
+		path to directory where you want to save the files
+	suffix: string
+		name of output file will be <taxID><suffix>.tsv . Default "_annotated_orthology"
+	"""
+	if directory[-1] != "/":
+		directory = directory + "/"
+
+	for table in annotated_tables:
+		taxID = table.iat[0, 0].split(".")[0]
+		file = directory + taxID + suffix + ".tsv"
+
+		table.to_csv(file, index = False, sep = "\t")
 
 
 # HGNC method
@@ -372,9 +393,8 @@ def find_query_orthologs(query_path, translated_orthologies):
 #lookup = make_lookup("/g/arendt/data/phylomeV2/orthology_tables_nocollapse/5759_orthologs.tsv")
 lookup = pd.read_csv("/g/arendt/Javier/Python/geneannotator/tests/lookup_5759.txt", sep = "\t", keep_default_na=False)
 translated_orthologies = translate_orthologies("/g/arendt/Javier/Python/geneannotator/tests/translated_orthotables/", lookup)
-finaltables = find_query_orthologs("/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/TFs_Ensembl_v_1.01.txt", translated_orthologies)
-print(finaltables)
+annotated_tables = find_query_orthologs("/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/TFs_Ensembl_v_1.01.txt", translated_orthologies)
+#print(annotated_tables)
 # Save
-#finalorthotable.to_csv("/g/arendt/Javier/Python/TF_annot_methods/Phylome/Data/TF_annotated_orthology_tables/" + file, index = False, sep = "\t")
-#file = file.replace("translated_", "")
-#file = file.replace("_human", "_TF_Ensembl-Version")
+save_annotated(annotated_tables, "/g/arendt/Javier/Python/geneannotator/tests/")
+

@@ -1,0 +1,3 @@
+##Seed_(co-)orthologs	type	ENSEMBL_ID	orthologs	GeneName_target	ENSEMBL_query-only	GeneName_target_query-only
+2769.R7Q8Y2	one-to-one	ENSG00000151657	9606.O60870	KIN	ENSG00000151657	KIN
+2769.R7QAR8	one-to-one	ENSG00000197114	9606.Q8N5A5	ZGPAT	ENSG00000197114	ZGPAT
