@@ -8,7 +8,7 @@ Below you will find a short tutorial on how to use this pipeline in python. We w
 There are some files we will need in order to run this pipeline. The current version (Oct-2021) needs to gather some files manually, future versons will automatize this procedure.
 
 ### Query list
-To run the pipeline, we need a list with human genes that represent all genes with the desired function in humans, in this case, a curated list with all human TFs. t do so, simply right a text/tsv/csv file with a single line per gene. Genes can be in any format we want. In this case we are using (the recommended) Ensembl GenID
+To run the pipeline, we need a list with human genes that represent all genes with the desired function in humans, in this case, a curated list with all human TFs. t do so, simply right a text/tsv/csv file with a single line per gene.They have to be in Ensembl Gen ID format. In the future more ID types will be added.
 
 ### Eggnog database
 We need to know for each of the genes in the "query" list, what are their respective orthogroups. This data is stored in the Eggnog database. We can use orthogroups at different levels. Let's say we want to relate Human and *Capitella* genes by both Metazoan and Bilaterian orthogroups. Then we need to goto the [Eggnog database](http://eggnog5.embl.de/#/app/home), go to Downloads, find out level of interest, in this case Metazoan and Bilaterian, one at a time, and download the (taxID)\_members.tsv.gz. De-compress it and save it in a folder.
@@ -226,3 +226,124 @@ Additionally with the `--keep_all_columns` flag you can keep all emapper output 
 
 
 
+#**Phylome method**
+
+This method does not rely on Eggnog or emapper directly. Instead it works on some of the output files from the Phylome, another resource created by the Jaime Huerta Cepas lab in CBGP, Madrid, Spain.
+The phylome uses proteomes from a great number of species. One of the outputs from the phylome are orthology tables that show for each of the genes in each of those species, which genes are their orthologs.
+This tables show, for each species' gene, what are their orthologs (in all the species in the phylome). As humans are in the phylome, these tables tell you all huamn orthologs of any species in the phylome.
+
+Having a list of human genes representing a gene module/family we can know for any gene in the phylome, if they are orthologous to a human family/module. If they are we can say the target gene also belongs to the same module/family (putatively).
+
+For demonstration purposes we will now run a pipeline where we annotate genes in two random phylome species with the question:  Which genes in the *Cladocora caespitosa* and *Danio rerio* (Zebrafish) proteomes are transcription factors (TFs)?.
+
+## **Required files**
+### Phylome orthology tables
+Non-collapsed orthology tables outputted from the phylome. They should be in a foder **containing only orthology tables**. If you just want to annotate few species you can keeep a copy of those in a separate folder. They will not be overritten.
+
+### Query list
+To run the pipeline, we need a list with human genes that represent all genes with the desired function in humans, in this case, a curated list with all human TFs. To do so, simply wright a text/tsv/csv file with a single line per gene. GeneIDs can be in either EnsemblID shape for the regular pipeline or HGNC (Genecards) format or the HGNC pipeline.
+
+
+
+##**The pipeline**
+There are two versions of the piplene, depending on what gene ID rely the most, ENSMEBLIDs or HGNC symbols.
+The orthoogy tables output orthologs in HGNC and Unirpot format. If you want to match your query list with th orthology tables using HGNCs (**HGNC method**), then there is only one step for the pipeline. If you want to do the matchng with ENSEMBLIDs (**regular method**) you need to first create a lookup table and then use it to translate the orthology tables o EnsemblIDs and finally fo the matching, 3 steps.
+
+### Python
+### Import data
+You don't need to import any data if it's the first time you are running the pipeline or you are running the HGNC method.
+If however you already run the pipeline before and you have a lookup table you can just import it with:
+
+```
+lookup = pd.read_csv("path/to/lookup.tsv", sep = "\t", keep_default_na=False)
+```
+
+If you are running the regular pipeline and you already have the orthology tables translated to ENSEMBLID we will see later how to use them.
+
+
+### Run pipeline
+1. **Make a lookup**
+If it's the first time runing the piplene first we have to make a a lookup table to translate the orthology table(s) to ENSEMBLIDs. This procedure kaes a lookup with the human genes that appear in the inuputted tables. The recommended behaviour is saving a lookup table with all human genes in the phylome to avoid making it every time as it is quite time consuming. This table could be used with every other species in the phylome.
+
+```
+lookup = make_lookup("path/to/folder/with/orthology_tables")
+```
+
+Alternatively you can make a lookup for a few or a single orthology table by specifying having only few species in the folder or putting a path to a single file. However, this is not recommended
+
+2. **Save the lookup**
+Now you can save the lookup table like:
+```
+lookup.to_csv("save/path/lookup.txt, sep = "\t", index = False)
+```
+Alternatively you can not save it and continue with the pipeline
+
+3. **Translate orthology table(s)**
+Now you need to translate the orthology tables human orthologs from UniprotKB to ENSEMBL gene ID. To do so use the newly created lookup (or the one you saved, see [Import data](###import-data)) 
+```
+translated_orthologies = translate_orthologies("path/to/phylome/orthology/tables", lookup)
+```
+
+You can also just input a path to a single orthology table.
+If you want to save these to be able to do multiuple annotations on them without running the translation again you can do so with the following code:
+```
+save_annotated(translated_orthologies, "output/directory/", suffix = "_translated")
+```
+The last argument is the suffix. the name of output files will be taxID_suffix.tsv. You can cahnge the suffix by changing that parameter.
+
+4. **Annotate genes**
+Finally to annotate genes simply use the translated tables and your human query (gene family/module).
+```
+annotated_tables = find_query_orthologs("/path/to/query", translated_orthologies)
+```
+
+If you already had the translated tables you can just specify path to directory or file:
+```
+annotated_tables = find_query_orthologs("/path/to/query", "path/to/translated_orthologies")
+```
+
+5. **Save annotated tables**
+annotate_files is a list ontaining all your annotated datasets. To save them (recommended) use the following function:
+
+```
+save_annotated(annotated_tables, "/path/to/saving/folder/")
+```
+Name of the output files will be taxID_annotated_orthology.tsv. You can cahnge the "annotated_orthology" suffix with the `suffix` parameter.
+
+
+### HGNC version
+Much simpler. Equally accurate than the regular piplene, although if you want to be thorough it would be better to compare both pipelnes. 
+There is no need to translate or create a lookup table. Simply, once you have your query full of Human HGNC symbols representing your gene module/family you can run:
+```
+annotated_tables = annotate_orthology_HGNC_method("path/to/query.txt", "path/to/orthology_tables/")
+```
+Alternatively you cn put a a path to a single file.
+
+Finally, save your tables with:
+```
+save_annotated(annotated_tables, "/path/to/saving/folder/")
+```
+
+### Command line
+To run the pipeline in command line you have the `python geneannotator/phylome_argparse.py` function. It works exactly the same as the pure python version, but in a single line.
+
+You can run the whole pipeline without saving any file, but the recommended behaviour is the following.
+
+1. **Save a lookup**
+Using all phylome orthology tables make a lookup and save it by specifyingnly the path to the orthology tables, an output file and the `--output_lookup` flag:
+```
+python geneannotator/phylome_argparse.py -ot "path/to/phylome_tables/" -o "saving/path/" --output_lookup
+```
+
+2. **Translate**
+Translate orthology tables using our saved lookup
+```
+python geneannotator/phylome_argparse.py -ot "/g/arendt/Javier/Python/geneannotator/tests/test1/phylome_tables/" -l "/g/arendt/Javier/Python/geneannotator/tests/test1/lookup.tsv"  -o "/g/arendt/Javier/Python/geneannotator/tests/test1/translated_orthotables/" --output_translated_orthotables
+```
+
+3. **Annotate**
+```
+python geneannotator/phylome_argparse.py -tr "/g/arendt/Javier/Python/geneannotator/tests/test1/translated_orthotables/" -l "/g/arendt/Javier/Python/geneannotator/tests/test1/lookup.tsv" -q"/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/TFs_Ensembl_v_1.01.txt" -o "/g/arendt/Javier/Python/geneannotator/tests/test1/"
+```
+
+Do not save translated

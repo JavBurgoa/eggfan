@@ -237,6 +237,8 @@ def read_translated_tables(translated_orthologies):
 
 
 
+
+
 def subset_query_orthologs_and_position(orthoTable, human_query):
 	"""
 	Ths function takes the orthology tables (translated) and subsets them to include only the genes that have as orthologs ghuman genes in our query.
@@ -298,7 +300,46 @@ def subset_query_orthologs_and_position(orthoTable, human_query):
 
 
 
-def add_queryonly_columns(finalorthotable, query_position):
+def HGNC_subset_query_orthologs_and_position(orthoTable, human_query):
+	"""
+	This function is sister to subset_query_orthologs_and_position(). Same as that one takes the orthology tables (translated) and subsets them to include only the genes that have as orthologs ghuman genes in our query.
+	Additionally, it creates a separate table specifying in which position in the orthology those genes were. More infor in subset_query_orthologs_and_position() docs
+	This function has certain specificities to it that I think ould make the merging of these two functions a bit messy, despite how simmilar they are.
+
+	Attributes
+	----------
+	orthoTable: pandas dataframe
+		Orthology tables without any adulterations, straight from phylome output
+
+	human_query: pandas dataframe
+		Containing a single column with all HGNC (Genecards) gene IDs. They represent a module/family in humans that you want to identify in your target species. 
+	"""
+	symbol_col_name = "GeneName_target"
+	finalorthotable = pd.DataFrame(columns = {"##Seed_(co-)orthologs":[], "type":[], "GeneName_target":[], "GeneName_target_query-only":[]})
+	query_position = pd.DataFrame({"HGNC":[], "position_from_0":[], "number_of_IDs":[]})
+	
+	for gene in human_query.iloc[:, 0].unique():
+		condition = orthoTable[symbol_col_name].str.contains("(?:^" + gene +"$|^" + gene + ",|," + gene +",|," + gene + "$)", regex = True)
+		condition.fillna(value=False, inplace = True) # fill in one to one orthologs that were not trnalated
+		rows_perGene = orthoTable[["##Seed_(co-)orthologs", "type",  "GeneName_target"]][condition]
+
+		if len(rows_perGene) > 0:
+			# add final subset per human ortholog
+			finalorthotable = finalorthotable.append(rows_perGene)
+
+			# Create table with which gene was found in which position in which row
+			position = utils.find_position(rows_perGene, gene, column = symbol_col_name, HGNC = True)
+			table = utils.query_position_table(rows_perGene, position, gene, HGNC = True)
+			query_position = query_position.append(table)
+	
+	finalorthotable = finalorthotable[~finalorthotable.index.duplicated(keep='first')]
+	query_position = query_position.rename_axis('idx').sort_values(by = ['idx', 'position_from_0'])
+
+	return finalorthotable, query_position
+
+
+
+def add_queryonly_columns(finalorthotable, query_position, HGNC = False):
 	"""
 	Add to the final tables columns specifying which of the genes in the orothologs column appears in the human query
 
@@ -308,6 +349,8 @@ def add_queryonly_columns(finalorthotable, query_position):
 		translatedorthology tables from phylome wcontaining only genes with humna orthologs in our query and two empy columns to be filled by this function
 	query_position
 		table specific for each orthology table specifying which of the genes in the orothologs column appears in the human query and their position in the set. This is explained better in the docs from subset_query_orthologs_and_position()
+	HGNC: Boolean
+		Whether you want the version for the norml pipelien of the HGNC version
 	"""
 
 	index = finalorthotable.index.values
@@ -320,13 +363,15 @@ def add_queryonly_columns(finalorthotable, query_position):
 		rows = rows.reindex(new_index, fill_value="-") # If a gene was not a Tf substitue it with "-"
 		rows.index= list(range(len(rows.index.values)))
 
-		finalorthotable["ENSEMBL_query-only"][finalorthotable.index == i] = ','.join(list(rows["GenID"]))
+		if not HGNC:
+			finalorthotable["ENSEMBL_query-only"][finalorthotable.index == i] = ','.join(list(rows["GenID"]))
 		finalorthotable["GeneName_target_query-only"][finalorthotable.index == i] = ','.join(list(rows["HGNC"]))
 
 	# remove this after adding drop_duplicates in the very bginning.:
 	finalorthotable = finalorthotable.drop_duplicates() # It would be better to put this drop duplicates in the beginning, for each translated table, to make things a bit faster.
 
 	return finalorthotable
+
 
 
 
@@ -383,13 +428,48 @@ def save_annotated(annotated_tables, directory, suffix = "_annotated_orthology")
 		table.to_csv(file, index = False, sep = "\t")
 
 
-# HGNC method
 
+############################
+###### HGNC method #########
+
+# Make final tables with GeneID(s) species | orthology type | all human Ensembl orthologs | All HGNCs | TF EnsemblIDs | TF HGNCs
+def annotate_orthology_HGNC_method(query_path, orthology_tables_path):
+	"""
+	orthology_tables_path: string
+		path to folder containing orthology tables you want to annotate. Alternatively you can input a path to a single file
+	"""
+	## Import data
+	human_query = pd.read_csv(query_path)
+	orthology_tables_path = utils.directory_or_file(orthology_tables_path)
+
+	tables = []
+	for file in orthology_tables_path:
+		# Import
+		orthoTable = pd.read_csv(file, index_col=False, skiprows=[i for i in range(1,13)], sep = "\t")
+
+		# Format
+		orthoTable = orthoTable[orthoTable["target_species"] == "Homo sapiens"] ## Added for the HGNC pipeline
+
+		# Subset dataframes and locate query genes
+		finalorthotable, query_position = HGNC_subset_query_orthologs_and_position(orthoTable, human_query)
+
+		#### HGNC exclusive part ####
+		# Remove duplicates, because thep ipeline somehow duplicates the genes found in position 0. But account for the index, in case sma ortholog found in same position but itn different line
+		query_position['index'] = query_position.index
+		query_position.drop_duplicates(inplace=True)
+		del query_position['index']
+		##############################
+
+		finalorthotable = add_queryonly_columns(finalorthotable, query_position, HGNC = True)
+
+		tables.append(finalorthotable)
+
+	return tables
 
 
 
 ### Script
-
+"""
 #lookup = make_lookup("/g/arendt/data/phylomeV2/orthology_tables_nocollapse/5759_orthologs.tsv")
 lookup = pd.read_csv("/g/arendt/Javier/Python/geneannotator/tests/lookup_5759.txt", sep = "\t", keep_default_na=False)
 translated_orthologies = translate_orthologies("/g/arendt/Javier/Python/geneannotator/tests/translated_orthotables/", lookup)
@@ -397,4 +477,11 @@ annotated_tables = find_query_orthologs("/g/arendt/Javier/Python/Human_TF_Orthog
 #print(annotated_tables)
 # Save
 save_annotated(annotated_tables, "/g/arendt/Javier/Python/geneannotator/tests/")
+"""
 
+
+### HGNC version
+"""
+annotated_tables = annotate_orthology_HGNC_method("/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/TF_names_v_1.01.txt", "/g/arendt/Javier/Python/geneannotator/tests/translated_orthotables/")
+save_annotated(annotated_tables, "/g/arendt/Javier/Python/geneannotator/tests/")
+"""
