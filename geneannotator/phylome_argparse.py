@@ -31,21 +31,17 @@ args = parser.parse_args()
 if args.suffix == None:
 	args.suffix="_annotated_orthology"
 
-print(args.translated_orthotables)
-print(args.suffix)
-print(args.output)
-print(args.query)
-print(args.ortho_tables)
-
 ### Script
 # IF HGNC, run HGNC and exit
 if args.HGNC_method:
+	print("Running HGNC method")
 	annotated_tables = phylome.annotate_orthology_HGNC_method(args.query, args.ortho_tables)
-	phylome.save_annotated(annotated_tables, args.out)
+	phylome.save_annotated(annotated_tables, args.output)
+	exit()
 
 
 #If not HGNC, run normal pipeline:
-
+print("Running regular pipeline")
 ## If user inputs translated tables, bypass making lookup and translating, just annotate with query
 elif isinstance(args.translated_orthotables, str):
 
