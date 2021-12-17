@@ -139,7 +139,7 @@ def translate_from_HGNC(lost_genes, lookup):
 
 ###########################
 #### Make Lookup table ####
-def make_lookup(path, out = False):
+def make_lookup(path, overwrite=False):
 	"""
 	Gets all uniprot IDs from the specified orthology tables and makes a lookup table that translates them to whatever you desire. Default Ensembl IDs.
 
@@ -151,24 +151,25 @@ def make_lookup(path, out = False):
 		path to file where you want to save the lookup. Default, not saving anything
 	"""
 	# make lookup table and a list with all Unirpot IDs to be translated
-	lookup, uniprots = initial_lookup(path)
+	initial, uniprots = initial_lookup(path)
 
 	# make list with all genes not fully translated (either ENSEMBL_ID or HGNC were not retrieved)
-	lost_genes = check_lost_genes(uniprots, lookup)
+	lost_genes = check_lost_genes(uniprots, initial)
 
 	## Update table by translating HGNCs to ENSEMBLIDs when possible
-	updated = translate_from_HGNC(lost_genes, lookup) # this is very slow beacuase genecards only allows one gene at a time to translate
+	lookup = translate_from_HGNC(lost_genes, initial) # this is very slow beacuase genecards only allows one gene at a time to translate
 
-	if out is not False:
-		updated.to_csv(out, sep="\t", index=False)
+	lookup_loc = "./lookup.tsv"
+	if overwrite or not os.path.isfile(lookup_loc):
+		lookup.to_csv("./lookup.tsv", index = False, sep = "\t")
 
-	return updated
+	return lookup
 
 
 
 
 # Make translated orthology tables
-def translate_orthologies(path, lookup, out = False):
+def translate_orthologies(path, lookup, overwrite=False):
 	"""
 	Takes in one or several phylome orthology tables and translates their human UniprotIDs to ENSEMBL and HGNC, adding an extra column on each of the orthology tables inputed. Output is a list with a dataframe per orthology table
 	path: string.
@@ -180,8 +181,9 @@ def translate_orthologies(path, lookup, out = False):
 	"""
 	orthology_tables = utils.directory_or_file(path)
 	
-	tables = []
+	tables = {}
 	for fullpath in orthology_tables:
+		species_id = get_species_id(fullpath)
 		# Import
 		orthoTable = pd.read_csv(fullpath, index_col=False, skiprows=[i for i in range(1,13)], sep = "\t")
 		
@@ -197,24 +199,22 @@ def translate_orthologies(path, lookup, out = False):
 		translated_orthoTable["ENSEMBL_ID"] = translated_orthoTable["ENSEMBL_ID"].replace("^,", "", regex=True) # the pipeline added an extra comma in the beginning by default
 		translated_orthoTable["ENSEMBL_ID"] = translated_orthoTable["ENSEMBL_ID"].replace(",,", ",-,", regex = True).replace(",,", ",-,", regex = True).replace("^,", "-,", regex = True).replace(",$", ",-", regex = True) # add dashes where missing genes (a relpace is repeated on purpose)
 		
-		tables.append(translated_orthoTable)
+		tables[species_id] = (translated_orthoTable)
 	
 	# Save
-	if os.path.isdir(out):
-		for i in range(len(orthology_tables)):
-			filename = os.path.basename(orthology_tables[i])
-			file = out + filename.replace("_orthologs.tsv", "_human_orthologs.tsv")
-			tables[i].to_csv(file, index = False, sep = "\t")
-
-	elif isinstance(out, str):
-		tables[0].to_csv(out, index = False, sep = "\t")
-	
+	for species_id, table in tables.items():
+		species_orthologs = "./translated/" + species_id + "_human_orthologs.tsv"
+		if overwrite or not os.path.isfile(species_orthologs):
+			table.to_csv(species_orthologs, index = False, sep = "\t")
 
 	return tables
 
 
 
-
+def get_species_id(ortho_tables):
+    basename = os.path.basename(ortho_tables)
+    species_id = basename.split("_")[0]
+    return species_id
 
 def read_translated_tables(translated_orthologies):
 	"""
