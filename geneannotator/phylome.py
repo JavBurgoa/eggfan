@@ -8,7 +8,7 @@
 import pandas as pd
 import numpy as np
 import os
-import utils
+from geneannotator import utils
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', 500)
 
@@ -96,7 +96,7 @@ def translate_from_HGNC(lost_genes, lookup):
 	# For those human uniprots that only got HGNC translation, take that HGNC and translate it to ENSEMBL_IDs
 	lost_genes = lost_genes.replace(r'^\s*$', np.nan, regex=True) # replace empty strings with NAs, for later dropna()
 	lost_genes = lost_genes.dropna()
-	table = {}
+	table = []
 	for i in lost_genes.index.values:
 
 		HGNC = lost_genes.loc[i, "Translation"]
@@ -105,8 +105,8 @@ def translate_from_HGNC(lost_genes, lookup):
 		if not HGNC.startswith("ENSG0000"):
 			
 			ENSG = utils.HGNC_request(gene = HGNC)
-			table[i] = [Uniprot, ENSG, HGNC]
-			print(table[i])
+			table.append([Uniprot, ENSG, HGNC])
+			# print(table[i])
 
 	table = pd.DataFrame.from_dict(table, orient = 'index').dropna()
 	table.columns = lookup.columns
@@ -157,7 +157,10 @@ def make_lookup(path, overwrite=False):
 	lost_genes = check_lost_genes(uniprots, initial)
 
 	## Update table by translating HGNCs to ENSEMBLIDs when possible
-	lookup = translate_from_HGNC(lost_genes, initial) # this is very slow beacuase genecards only allows one gene at a time to translate
+	if len(lost_genes) == 0:
+		lookup = translate_from_HGNC(lost_genes, initial) # this is very slow beacuase genecards only allows one gene at a time to translate
+	else:
+		lookup = initial
 
 	lookup_loc = "./lookup.tsv"
 	if overwrite or not os.path.isfile(lookup_loc):
@@ -201,7 +204,10 @@ def translate_orthologies(path, lookup, overwrite=False):
 		
 		tables[species_id] = (translated_orthoTable)
 	
-	# Save
+	# Create dir if it doesn't exist
+	if not os.path.exists("./translated/"):
+		os.makedirs("./translated/")
+	# save
 	for species_id, table in tables.items():
 		species_orthologs = "./translated/" + species_id + "_human_orthologs.tsv"
 		if overwrite or not os.path.isfile(species_orthologs):

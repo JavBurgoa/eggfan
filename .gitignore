@@ -2,3 +2,4 @@
 .tests/run.sh
 .tests/genan.log
 .tests/*
+./geneannotator/__pycache__/*
