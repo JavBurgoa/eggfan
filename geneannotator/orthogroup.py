@@ -182,12 +182,13 @@ def egg_translate(eggnog, lookup, taxID = "9606"):
         egg_prots = egg_prots.merge(lookup, how = "left", on = prot_column)
         dfs.append(egg_prots)
 
-    # Save
+    # Save by adding @taxID to Columns
     out = dfs[0]
     if len(dfs) > 1:
         for df in dfs[1:]:
             df = df.drop(columns = ["HGNC symbol", "Gene stable ID"])
             out = out.merge(df, on = prot_column, suffixes = tax_levels)
+    else:  out.columns = [i+tax_levels[0] if i.startswith("Orthogroup") else i for i in out.columns.values]
     return out
 
 
@@ -276,7 +277,7 @@ def format_quer_orth(query_orthogroups, ortho_cols):
 		subset.append(col)
 		new_query_orth = query_orthogroups.loc[:, subset]
 
-		# Add @ taxID to orthogroups
+		# Add @taxID to orthogroups
 		orthoname = col.replace("Orthogroup", "")
 		new_query_orth.loc[:, col] = new_query_orth.loc[:, col] + orthoname
 

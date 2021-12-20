@@ -1,8 +1,7 @@
 # **Phylome method**
 
 This method does not rely on Eggnog or emapper directly. Instead it works on some of the output files from the Phylome, another resource created by the Jaime Huerta Cepas lab in CBGP, Madrid, Spain.
-The phylome uses proteomes from a great number of species. One of the outputs from the phylome are orthology tables that show for each of the genes in each of those species, which genes are their orthologs.
-This tables show, for each species' gene, what are their orthologs (in all the species in the phylome). As humans are in the phylome, these tables tell you all huamn orthologs of any species in the phylome.
+The phylome uses proteomes from a great number of species. One of the outputs from the phylome are orthology tables that show for each of the genes in each of those species, which genes are their orthologs (in all the species in the phylome). As humans are in the phylome, these tables tell you all human orthologs of any gene in the phylome.
 
 Having a list of human genes representing a gene module/family we can know for any gene in the phylome, if they are orthologous to a human family/module. If they are we can say the target gene also belongs to the same module/family (putatively).
 

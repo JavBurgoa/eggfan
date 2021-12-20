@@ -1,28 +1,30 @@
 # **Orthogroup Method**
-Ths method uses the following basis: If you know a gene exerts a particular function in humans (The gene is a transcription factor, or a contractile module, etc.) and another gene (target) from another species belongs to the same orthogroup than that human gene, then the target gene also probably is a transcription factor, contractile module etc in its species.
+This method uses the following basis: If you know a gene exerts a particular function in humans (The gene is a transcription factor, or belongs to a contractile module, etc.) and another gene (target) from another species belongs to the same orthogroup than that human gene, then the target gene also probably is a transcription factor, contractile module etc.
+Orthorgoups are functional categories. Theoretically, any gene within a orthogroups has more or less the same function in its species of origin. Any gene/protein in an orthogroup that contains a Human kinase is (probably) a kinase.
 
-Below you will find a short tutorial on how to use this pipeline in python. We will use the following example: We want to know which genes in the *Capitella* *teleta* genome are transcription factors (TFs).
+Below you will find a short tutorial on how to use this pipeline in python. We will use the following example: We want to know which genes in the *Capitella teleta* genome are transcription factors (TFs).
 
 
 ## **Required files**
-There are some files we will need in order to run this pipeline. The current version (Oct-2021) needs to gather some files manually, future versons will automatize this procedure.
+There are some files we will need in order to run this pipeline. The current version (Oct-2021) needs to gather some files manually, future versions will automatize this procedure.
 
 ### Query list
-To run the pipeline, we need a list with human genes that represent all genes with the desired function in humans, in this case, a curated list with all human TFs. t do so, simply right a text/tsv/csv file with a single line per gene.They have to be in Ensembl Gen ID format. In the future more ID types will be added.
+To run the pipeline, we need a list with human genes that represent all genes with the desired function we want to annotate, in this case, a curated list with all human TFs. Once you have this information, simply right a text/tsv/csv file with a single line per gene. They have to be in Ensembl Gen ID format. In the future more ID types will be added. The list does not have to be complete, but the less human genes you add, the more TFs you will miss in the target species.
 
 ### Eggnog database
-We need to know for each of the genes in the "query" list, what are their respective orthogroups. This data is stored in the Eggnog database. We can use orthogroups at different levels. Let's say we want to relate Human and *Capitella* genes by both Metazoan and Bilaterian orthogroups. Then we need to goto the [Eggnog database](http://eggnog5.embl.de/#/app/home), go to Downloads, find out level of interest, in this case Metazoan and Bilaterian, one at a time, and download the (taxID)\_members.tsv.gz. De-compress it and save it in a folder.
+We need to know for each of the genes in the "query" list, what are their respective orthogroups. This data is stored in the Eggnog database. We can use orthogroups at different levels. Let's say we want to relate Human and *Capitella* genes by both Metazoan and Bilaterian orthogroups. Then we need to go to the [Eggnog database](http://eggnog5.embl.de/#/app/home), go to Downloads, find out our taxonomic level(s) of interest, in this case Metazoan and Bilaterian and download the (taxID)\_members.tsv.gz. De-compress the file(s) and save them in a folder. By default you should use Metazoan and Bilaterian orthorgoups, but if you species has a more recent common ancestor with humans you can add any extra levels.
 
 ### Lookup for conversions
-The eggnog files we just downloaded show us all orthogroups witin a tax level and all **Proteins** that belong to that group. However, in most cases we won't have a list of **Proteins** but a list of **Ensembl Gen IDs** or something else. So we need to translate those Proteins in the eggnog files to whatever we have in our query list. To do so we need a lookup table that gives us for each protein in eggnog, its Ensembl Gen ID equivalent.
+The eggnog files we just downloaded show us all orthogroups within a tax level and all **proteins** that belong to that group. However, in most cases our query won't be a list of **proteins** but a list of **Ensembl Gen IDs**. So we need to translate those ENSEMBL Protein IDs in eggnog to ENSEMBL Gene IDs. Only this way we can add orthogroup information to our query. To do this translation we need a lookup table that gives us for each protein in eggnog, its Ensembl Gen ID equivalent.
 
-The recommended lookup table would be human Ensembl protein IDs to Ensembl gene IDs and HGNC symbols (this last one is optional but highly recommended to add). However you could have your query list in something other than Ensemble gene IDs, in which case you could switch the Enseble gene IDs column of the lookup table by whatever ID format you have in your query. However this hasn't been very well tested and may lead to problems. At the moment this pipeline only works if your query contains human genes.
+The recommended lookup table would be human Ensembl protein IDs to Ensembl gene IDs and HGNC symbols (this last one is optional but highly recommended to add). However you could have your query list in something other than Ensemble gene IDs, in which case you could switch the Enseble gene IDs column of the lookup table by whatever ID format you have in your query. However this hasn't been very well tested and may lead to problems.
 
-To do so we go to [Biomart](https://www.ensembl.org/biomart/martview/62f7cff64a6aaf9711bf7c0a3e52f7e7), and we select the species we want to translate, in this case, human. Then, in attributes we choose what are the conversions we want to make. We are hoosing **Protein stable** ID and **Gene stable ID**. Additionally, we want to know a more human readable name for each gene, so we also go to **EXTERNAL** and select HGNC symbol. Finally we click on Result in the top left of the screen and after it loads we hit GO! to download in tsv format.
+To do so we go to [Biomart](https://www.ensembl.org/biomart/martview/62f7cff64a6aaf9711bf7c0a3e52f7e7), and we select the species we want to translate, in this case, human. Then, in attributes we choose what are the conversions we want to make. We are using **Protein stable ID** and **Gene stable ID**. Additionally, we want to know a more human readable name for each gene, so we also go to **EXTERNAL** and select **HGNC symbol**. Finally we click on Result in the top left of the screen and after it loads we hit GO! to download the lookup in tsv format.
 
-> You could run the pipeline without the translation, for which, at the moment (Oct-2021)
-> there is no in-built functionality, however, you can fake this by creating
-> a lookup table where there are two identical columns, both with Protein IDs
+> You could run the pipeline without the translation, using protein IDs for the
+> matching.for which, at the moment (Oct-2021) there is no in-built functionality, 
+> however, you can fake this by creating a lookup table where there are two 
+> identical columns, both with Protein IDs
 
 
 
@@ -142,7 +144,7 @@ With this information you can now run the pipeline from command line. Here is an
 
 Being the lookup table, a table obtained in Biomart exactly as specified in [Lookup for conversions](###lookup-for-conversions)
 ```
-python geneannotator/Orthogroup_argparse.py -eg '/path/to/Eggnog_Bilateria(33213)_members.tsv' -eg '/path/to/Eggnog_Metazoa(33208)_members.tsv' -l 'path/to/lookup.txt' -q "/path/to/Capitella_emapper_output.txt" -m "Gene stable ID"
+python geneannotator/Orthogroup_argparse.py -em 'path/to/emapper.txt' -eg '/path/to/Eggnog_Bilateria(33213)_members.tsv' -eg '/path/to/Eggnog_Metazoa(33208)_members.tsv' -l 'path/to/lookup.txt' -q "/path/to/human_TF_list.txt" -m "Gene stable ID"
 ```
 This will output a dataframe with all of your emapper genes that share orthogroup with your human query genes and their respective translations. the same functionality than the python version, but in a single line of code.
 
@@ -153,5 +155,7 @@ There are also some additional flags one can add to modify the output. For examp
 Finally `--QC` does not modify the output. Actually it doesn't even let the pipline finish. It outputs a list with all proteins in eggnog that ere not translated. This can happen because the lookup tabl is defective or because some of eggnog's protein IDs are outdated and therefore do not match the lookup table. You can correct this by adding the outdated versions manually in the lookup.
 
 
+
+eXPLAIN OUTPUT LIKE WHAT'S UP WITH | AND , . in Orthgroup column you have all Metazoan and bilaterian orthorgoups that your genes belong to. In the other three columns you have all the human genes that belong to those orthorgoups. Genes separated by "|" belong to the same orthogroup, genes separated by "," belong to different orthogroups. the order in Orthogroup column is the same as in the other columns.
 &nbsp;
 &nbsp;
