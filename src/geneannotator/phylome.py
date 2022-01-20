@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 import os
 from tqdm import tqdm
-import utils
+from geneannotator import utils
 
 
 pd.set_option('display.max_columns', None)
@@ -159,10 +159,11 @@ def make_lookup(path):
 	lost_genes = check_lost_genes(uniprots, initial)
 
 	## Update table by translating HGNCs to ENSEMBLIDs when possible
-	if len(lost_genes) == 0:
-		lookup = translate_from_HGNC(lost_genes, initial) # this is very slow beacuase genecards only allows one gene at a time to translate
-	else:
+	if len(lost_genes) == 1 and lost_genes.iat[0,0] == "": # If there are no lost genes
 		lookup = initial
+	else:
+		lookup = translate_from_HGNC(lost_genes, initial) # this is very slow beacuase genecards only allows one gene at a time to translate
+
 
 	return lookup
 
@@ -417,7 +418,6 @@ def find_query_orthologs(query_path, translated_orthologies):
 
 	return tables
 
-	
 
 def save_annotated(annotated_tables, directory, suffix = "_annotated_orthology"):
 	"""
@@ -432,9 +432,19 @@ def save_annotated(annotated_tables, directory, suffix = "_annotated_orthology")
 	suffix: string
 		name of output file will be <taxID><suffix>.tsv . Default "_annotated_orthology"
 	"""
+	annotated_tables = eliminate_empty_dataframes(annotated_tables)
+	
+	# If there is nothing to save, exit
+	if len(annotated_tables) == 1 and annotated_tables[0].empty:
+		exit("* No matches found in any of the inputed orthology tables, exiting pipeline")
+	elif len(annotated_tables) == 0:
+		exit("* No matches found in any of the inputed orthology tables, exiting pipeline")
+
+	# If directory is not well written, correct it
 	if directory[-1] != "/":
 		directory = directory + "/"
 
+	# Save
 	for table in annotated_tables:
 		taxID = table.iat[0, 0].split(".")[0]
 		file = directory + taxID + suffix + ".tsv"
@@ -442,6 +452,16 @@ def save_annotated(annotated_tables, directory, suffix = "_annotated_orthology")
 		table.to_csv(file, index = False, sep = "\t")
 
 
+def eliminate_empty_dataframes(annotated_tables):
+	"""
+	For each dataframe in list, check if it's empy, if yes, remove it. If all empty print "(No matches found in any of the inputed orthology tables, exiting pipeline)"
+	"""
+
+	for i in range(len(annotated_tables)):
+		if annotated_tables[i].empty:
+			del annotated_tables[i]
+
+	return annotated_tables
 
 ############################
 ###### HGNC method #########

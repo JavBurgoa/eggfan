@@ -35,7 +35,7 @@ If you are running the regular pipeline and you already have the orthology table
 ### Run pipeline
 On the top of your file put the required dependencies:
 ```
-import phylome
+from geneannotator import phylome
 import pandas as pd
 import numpy as np
 import os

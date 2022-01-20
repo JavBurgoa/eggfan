@@ -1,114 +1,118 @@
+from typing import Annotated
 import phylome
-import argparse
+import utils
 import pandas as pd
-import numpy as np
 import os
+import argparse
+import shutil
 
 
-def main(args):
-    # Default value for suffix
-    if args.suffix == None:
-        args.suffix = "_annotated_orthology"
+# 1. which method?
+#     A. HGNC?
+#     annotated_tables = phylome.annotate_orthology_HGNC_method(args.query, args.ortho_tables)
 
-    ### Script
-    # IF HGNC, run HGNC and exit
-    if args.HGNC_method:
-        print("Running HGNC method")
-        annotated_tables = phylome.annotate_orthology_HGNC_method(
-            args.query, args.ortho_tables
+#     B1. read or make lookup?
+#     lookup = phylome.make_lookup(args.ortho_tables)
+
+#     B2. save lookup?
+
+#     B3. read or make translated_orthologies?
+#     translated_orthologies = phylome.translate_orthologies(args.ortho_tables, lookup)
+
+#     B4. save translated_orthologies?
+
+#     B5. run rest
+#     annotated_tables = phylome.find_query_orthologs(args.query, translated_orthologies)
+
+# 2. save result
+# phylome.save_annotated(annotated_tables, args.output, args.suffix)
+
+# flags = [HGNC]
+
+
+def main(query, ortho_tables, output, input_lookup, suffix, flags):
+
+    if suffix == None:
+        suffix = "_annotated_orthology"
+
+    # first go to the result directory
+    #os.chdir(output)
+    if flags["HGNC"]:
+        annotated_tables = phylome.annotate_orthology_HGNC_method(query, ortho_tables)
+    else:
+        lookup = get_lookup(ortho_tables, input_lookup)
+        translated_orthologies = get_translated_orthologies(
+            ortho_tables, lookup, flags["input_translated"]
         )
-        phylome.save_annotated(annotated_tables, args.output)
-        exit()
+        annotated_tables = phylome.find_query_orthologs(query, translated_orthologies)
+    
+    print("saving") # These two lines below save as long as you didn't input the lookup and/or the translated tables
+    save_lookup(lookup, output, flags["input_translated"], input_lookup)
+    save_translated(translated_orthologies, output, flags["input_translated"])
+    
+    phylome.save_annotated(annotated_tables, output, suffix)
+    print("done")
 
-    ## If user inputs translated tables, bypass making lookup and translating, just annotate with query
-    elif isinstance(args.translated_orthotables, str):
-        if os.path.isfile(args.translated_orthotables):
 
-            translated_orthologies = list(
-                pd.read_csv(args.translated_orthotables, sep="\t")
+
+
+
+
+
+
+def get_translated_orthologies(ortho_tables, lookup, input_translated):
+    """
+    either read the orthology table(s) or make them
+    """
+    if input_translated:
+
+        translated_orthologies = phylome.read_translated_tables(ortho_tables)
+
+    else:
+        
+        translated_orthologies = phylome.translate_orthologies(
+                ortho_tables, lookup
             )
-            annotated_tables = phylome.find_query_orthologs(
-                args.query, translated_orthologies
-            )
-
-        else:
-
-            annotated_tables = phylome.find_query_orthologs(
-                args.query, args.translated_orthotables
-            )  # If a directory, the function will take care of it
-
-        phylome.save_annotated(annotated_tables, args.output, args.suffix)
-
-    else:  # --translated_orthotables not inputted
-
-        # If user does not input translated tables but inputs a lookup table
-        if isinstance(args.lookup, str):
-
-            lookup = pd.read_csv(args.lookup, sep="\t", keep_default_na=False)
-            translated_orthologies = phylome.translate_orthologies(
-                args.ortho_tables, lookup
-            )
-
-            # If user inputs a lookup table and a --output_translated_orthologies
-            if args.output_translated_orthotables:
-
-                if args.suffix == "_annotated_orthology":
-                    args.suffix = "_translated"
-
-                phylome.save_annotated(translated_orthologies, args.output, args.suffix)
-                exit(
-                    "Translated orthology tables created in "
-                    + args.output
-                    + ". Now proceed to run the function with the --translated_orthotables flag and remove the --output_output_translated_orthotables"
-                )
-
-            # If doesn't input the translated tables, annotate genes
-            annotated_tables = phylome.find_query_orthologs(
-                args.query, translated_orthologies
-            )
-            phylome.save_annotated(annotated_tables, args.output, args.suffix)
-
-        # If user does not input a lookup or translated_tables but the minimum is there (orthotables + query) run everything
-        elif args.lookup is None:
-
-            lookup = phylome.make_lookup(args.ortho_tables)
-
-            # IF user inputs a path to save the newly made lookup
-            if args.output_lookup:
-
-                lookup.to_csv(args.output + "lookup.tsv", index=False, sep="\t")
-                exit(
-                    "Lookup table created in "
-                    + args.output
-                    + ". Now proceed to un the function with the --lookup flag and remove the --output_lookup"
-                )
-
-            translated_orthologies = phylome.translate_orthologies(
-                args.ortho_tables, lookup
-            )
-
-            # If user does not input lookup or translated_tables or path to output lookup but they put --output_translated_orthotables..,
-            if args.output_translated_orthotables:
-
-                phylome.save_annotated(translated_orthologies, args.output, args.suffix)
-                exit(
-                    "Translated orthology tables created in "
-                    + args.output_translated_orthotables
-                    + ". Now proceed to run the function with the --translated_orthotables flag and remove the --output_output_translated_orthotables"
-                )
-
-            annotated_tables = phylome.find_query_orthologs(
-                args.query, translated_orthologies
-            )
-            phylome.save_annotated(annotated_tables, args.output, args.suffix)
-
-        else:
-            exit(
-                "If you want to input a lookup, please write a correct path to lookup file"
-            )
+    return translated_orthologies
 
 
-if __name__ == "__main__":
+def get_lookup(ortho_tables, lookup, overwrite=False):
+    if lookup is not None:
+        lookup = pd.read_csv(lookup, sep="\t", keep_default_na=False)
+    else:
+        lookup = phylome.make_lookup(ortho_tables)
+    return lookup
+
+
+def read_translated_ontologies(path_to_translated_orth):
+    translated_orthologies = list(pd.read_csv(path_to_translated_orth, sep="\t"))
+    return translated_orthologies
+
+
+def save_lookup(lookup, output, input_translated, input_lookup):
+    """
+    Save lookup or not depending on context
+    """
+    no_save = [not input_translated, not isinstance(input_lookup, str)]
+    if all(no_save): # Only if there is no input_trans and no input_lookup then save
+        lookup.to_csv(output + "lookup.tsv", sep="\t")
+
+
+def save_translated(annotated_tables, output, input_translated):
+    """
+    Save translated orthotables or not depending on context
+    """
+    if not input_translated:
+        save_dir = output + "/translated_orthology_tables"
+        if os.path.exists(save_dir):
+            shutil.rmtree(save_dir)
+        os.mkdir(save_dir)
+        phylome.save_annotated(annotated_tables, save_dir, suffix = "_translated")
+
+
+
+
+if True:
     ##### Arguments parser #####
     parser = argparse.ArgumentParser(
         description="Subsets phylome orthology tables to include only proteins that have as orthologs genes/proteins from your human query. Then adds somecolumns to excplicit which genes/proteins are the orthologs"
@@ -116,9 +120,10 @@ if __name__ == "__main__":
 
     # Full pipeline
     parser.add_argument(
-        "-ot",
-        "--ortho_tables",
+        "-t",
+        "--ortho-tables",
         type=str,
+        dest="ortho_tables",
         metavar="DIR",
         help="Path to folder containing all the unadulterated phylome orthology files you want to annotate or a path to one of those files.",
     )
@@ -137,24 +142,6 @@ if __name__ == "__main__":
         required=True,
         help="Path to folder where you want to save outputs. Can be saving a lookup, translated tables or annotated tables.",
     )
-
-    # Shortcuts
-    parser.add_argument(
-        "-l",
-        "--lookup",
-        type=str,
-        metavar="",
-        required=False,
-        help="Optional. Path to lookup table generated by this very function to shortcut the creation of a lookup table. Should contain three columns with UniProtKB, ENEMBL_ID and HGNC_symbol conversions. Please note that the lookup table is done for the input files, so make sure you are using the lookup made with same or more files than your current input",
-    )
-    parser.add_argument(
-        "-tr",
-        "--translated-orthotables",
-        type=str,
-        metavar="",
-        required=False,
-        help="Optional. Path to translated Orthology tables. This flag will shortcut the creation of a lookup table and the translation of the orthology files.",
-    )
     parser.add_argument(
         "-s",
         "--suffix",
@@ -164,24 +151,32 @@ if __name__ == "__main__":
         help="Optional. name of output files will be <taxID><suffix>.tsv . Default '_annotated_orthology' for annotated files, '_translated' for translated files. Use it if you are outputting the annotated files (end of pipeline) or --output_translated_orthotables",
     )
 
-    # Output extra files
     parser.add_argument(
-        "--output-lookup",
-        action="store_true",
-        help="Optional. Path to file where you want to store the newly created lookup. The generated lookup will be done specifically for the inutted ortholohy tables, so make that when you use this lookup table you do so with the same (or more) orthology tables than the ones used to make this lookup",
-    )
-    parser.add_argument(
-        "--output-translated-orthotables",
-        action="store_true",
-        help="Optional. Path to folder where you want to store the newly created translated orthology tables. This translation consists of adding an extra column with all human orthologs in ENSEMBL gen ID format (instead of UNIPROT)",
+        "-l",
+        "--lookup",
+        type=str,
+        metavar="",
+        required=False,
+        help="Optional. Path to lookup table that will be used to make translated orthology tables"
     )
 
+    parser.add_argument(
+        "--input_translated",
+        action="store_true",
+        help="If true a new translation of the orthology tables will not be made. The pipeline will be run with the orthology tables in --ortho_tables ",
+    )
     # HGNC method
     parser.add_argument(
-        "--HGNC-method",
+        "--HGNC",
         action="store_true",
+        dest="hgnc",
         help="Use HGNC to do the matching. This avoids making a lookup and translating the orthology tables",
     )
 
     args = parser.parse_args()
-    main(args)
+    flags = {}
+    flags["input_translated"] = args.input_translated
+    flags["HGNC"] = args.hgnc
+
+    if __name__ == '__main__':
+       main(args.query, args.ortho_tables, args.output, args.lookup, args.suffix, flags)

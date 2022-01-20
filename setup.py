@@ -4,9 +4,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="geneannotator",
+    name="geneannotator-burgoa",
     version="0.0.1",
-    author="Example Author",
+    author="Javier Burgoa",
     author_email="author@example.com",
     description="A small example package",
     long_description=long_description,
@@ -20,7 +20,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    package_dir={"": "geneannotator"},
-    packages=setuptools.find_packages(where="geneannotator"),
+    package_dir={"": "src"},
+    packages=setuptools.find_packages(where="src"),
     python_requires=">=3.6",
 )
