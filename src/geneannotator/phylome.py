@@ -8,7 +8,10 @@
 import pandas as pd
 import numpy as np
 import os
-from geneannotator import utils
+from tqdm import tqdm
+import utils
+
+
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', 500)
 
@@ -97,7 +100,7 @@ def translate_from_HGNC(lost_genes, lookup):
 	lost_genes = lost_genes.replace(r'^\s*$', np.nan, regex=True) # replace empty strings with NAs, for later dropna()
 	lost_genes = lost_genes.dropna()
 	table = []
-	for i in lost_genes.index.values:
+	for i in tqdm(lost_genes.index.values): # with progress bar
 
 		HGNC = lost_genes.loc[i, "Translation"]
 		Uniprot = lost_genes.loc[i, "UniProtKB"]
@@ -106,7 +109,6 @@ def translate_from_HGNC(lost_genes, lookup):
 			
 			ENSG = utils.HGNC_request(gene = HGNC)
 			table.append([Uniprot, ENSG, HGNC])
-			# print(table[i])
 
 	table = pd.DataFrame.from_dict(table, orient = 'index').dropna()
 	table.columns = lookup.columns
@@ -139,7 +141,7 @@ def translate_from_HGNC(lost_genes, lookup):
 
 ###########################
 #### Make Lookup table ####
-def make_lookup(path, overwrite=False):
+def make_lookup(path):
 	"""
 	Gets all uniprot IDs from the specified orthology tables and makes a lookup table that translates them to whatever you desire. Default Ensembl IDs.
 
@@ -162,17 +164,13 @@ def make_lookup(path, overwrite=False):
 	else:
 		lookup = initial
 
-	lookup_loc = "./lookup.tsv"
-	if overwrite or not os.path.isfile(lookup_loc):
-		lookup.to_csv("./lookup.tsv", index = False, sep = "\t")
-
 	return lookup
 
 
 
 
 # Make translated orthology tables
-def translate_orthologies(path, lookup, overwrite=False):
+def translate_orthologies(path, lookup, out = False):
 	"""
 	Takes in one or several phylome orthology tables and translates their human UniprotIDs to ENSEMBL and HGNC, adding an extra column on each of the orthology tables inputed. Output is a list with a dataframe per orthology table
 	path: string.
@@ -183,10 +181,11 @@ def translate_orthologies(path, lookup, overwrite=False):
 		path to DIRECTORY where you want the file(s) to be saved in case you are using various files, in shih¡ch case they should have the default name taxID_orthogroup.tsv . They will be given a slightly different name than the original by default, adding the suffix "_human_". If you just have one file you can specify the output name in the path
 	"""
 	orthology_tables = utils.directory_or_file(path)
+	lookup = lookup.dropna()
 	
-	tables = {}
+	tables = []
 	for fullpath in orthology_tables:
-		species_id = get_species_id(fullpath)
+		#species_id = get_species_id(fullpath)
 		# Import
 		orthoTable = pd.read_csv(fullpath, index_col=False, skiprows=[i for i in range(1,13)], sep = "\t")
 		
@@ -202,16 +201,18 @@ def translate_orthologies(path, lookup, overwrite=False):
 		translated_orthoTable["ENSEMBL_ID"] = translated_orthoTable["ENSEMBL_ID"].replace("^,", "", regex=True) # the pipeline added an extra comma in the beginning by default
 		translated_orthoTable["ENSEMBL_ID"] = translated_orthoTable["ENSEMBL_ID"].replace(",,", ",-,", regex = True).replace(",,", ",-,", regex = True).replace("^,", "-,", regex = True).replace(",$", ",-", regex = True) # add dashes where missing genes (a relpace is repeated on purpose)
 		
-		tables[species_id] = (translated_orthoTable)
+		tables.append(translated_orthoTable)
 	
-	# Create dir if it doesn't exist
-	if not os.path.exists("./translated/"):
-		os.makedirs("./translated/")
-	# save
-	for species_id, table in tables.items():
-		species_orthologs = "./translated/" + species_id + "_human_orthologs.tsv"
-		if overwrite or not os.path.isfile(species_orthologs):
-			table.to_csv(species_orthologs, index = False, sep = "\t")
+	# Save
+	if os.path.isdir(out):
+		for i in range(len(orthology_tables)):
+			filename = os.path.basename(orthology_tables[i])
+			file = out + filename.replace("_orthologs.tsv", "_human_orthologs.tsv")
+			tables[i].to_csv(file, index = False, sep = "\t")
+
+	elif isinstance(out, str):
+		tables[0].to_csv(out, index = False, sep = "\t")
+	
 
 	return tables
 
@@ -224,14 +225,19 @@ def get_species_id(ortho_tables):
 
 def read_translated_tables(translated_orthologies):
 	"""
+	Make allist with one dataframe if you have a file
 	Make a list of pandas dataframes if the input is a directory
 	Keep as is if input is a list of dataframes
 	"""
+
 	if isinstance(translated_orthologies, str):
-		orthology_tables = []
-		for file in os.listdir(translated_orthologies):
-			table = pd.read_csv(translated_orthologies + file, sep = "\t")
-			orthology_tables.append(table)
+		if os.path.isfile(translated_orthologies):
+			orthology_tables = [pd.read_csv(translated_orthologies, sep = "\t")]
+		else:
+			orthology_tables = []
+			for file in os.listdir(translated_orthologies):
+				table = pd.read_csv(translated_orthologies + file, sep = "\t")
+				orthology_tables.append(table)
 
 	elif isinstance(translated_orthologies, list):
 		orthology_tables = translated_orthologies
@@ -411,6 +417,8 @@ def find_query_orthologs(query_path, translated_orthologies):
 
 	return tables
 
+	
+
 def save_annotated(annotated_tables, directory, suffix = "_annotated_orthology"):
 	"""
 	Saves a list of dataframes into separate dataframes with specific names
@@ -458,7 +466,6 @@ def annotate_orthology_HGNC_method(query_path, orthology_tables_path):
 
 		# Subset dataframes and locate query genes
 		finalorthotable, query_position = HGNC_subset_query_orthologs_and_position(orthoTable, human_query)
-
 		#### HGNC exclusive part ####
 		# Remove duplicates, because thep ipeline somehow duplicates the genes found in position 0. But account for the index, in case sma ortholog found in same position but itn different line
 		query_position['index'] = query_position.index

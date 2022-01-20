@@ -32,11 +32,12 @@ def translate_uniprots(orthotable, lookup):
         query = query.replace("|", ",")
         query = query.split(",")
 
-        for uniprotID in tqdm(query):
+        for uniprotID in query:
             uniprotID = uniprotID.replace("9606.", "")
             genIDs = lookup["ENSEMBL_ID"][
                 lookup["UniProtKB"] == uniprotID
             ]  # there are several GenIDs per UniprotID. We will take all of them
+
             genIDs = "|".join(list(set(genIDs)))  # eliminate duplicates
             orthotable.iat[row, ENS_col] = orthotable.iat[row, ENS_col] + "," + genIDs
 
