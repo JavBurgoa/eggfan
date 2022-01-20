@@ -46,9 +46,9 @@ def main(query, ortho_tables, output, input_lookup, suffix, flags):
         )
         annotated_tables = phylome.find_query_orthologs(query, translated_orthologies)
     
-    print("saving") # These two lines below save as long as you didn't input the lookup and/or the translated tables
-    save_lookup(lookup, output, flags["input_translated"], input_lookup)
-    save_translated(translated_orthologies, output, flags["input_translated"])
+        # These two lines below save as long as you didn't input the lookup and/or the translated tables
+        save_lookup(lookup, output, flags["input_translated"], input_lookup)
+        save_translated(translated_orthologies, output, flags["input_translated"])
     
     phylome.save_annotated(annotated_tables, output, suffix)
     print("done")
