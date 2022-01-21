@@ -1,2 +1,3 @@
-# geneannotator
+# Installation
 
+pip install .

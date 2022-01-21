@@ -473,7 +473,7 @@ def annotate_orthology_HGNC_method(query_path, orthology_tables_path):
 		path to folder containing orthology tables you want to annotate. Alternatively you can input a path to a single file
 	"""
 	## Import data
-	human_query = pd.read_csv(query_path)
+	human_query = pd.read_csv(query_path, header=None)
 	orthology_tables_path = utils.directory_or_file(orthology_tables_path)
 
 	tables = []

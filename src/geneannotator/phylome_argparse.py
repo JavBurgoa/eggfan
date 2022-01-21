@@ -35,8 +35,6 @@ def main(query, ortho_tables, output, input_lookup, suffix, flags):
     if suffix == None:
         suffix = "_annotated_orthology"
 
-    # first go to the result directory
-    #os.chdir(output)
     if flags["HGNC"]:
         annotated_tables = phylome.annotate_orthology_HGNC_method(query, ortho_tables)
     else:
