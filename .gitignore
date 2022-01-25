@@ -1,5 +1,1 @@
-.outputs/
-.tests/run.sh
-.tests/genan.log
-.tests/*
-./geneannotator/__pycache__/*
+./tests/test_script_cluster_paths.py

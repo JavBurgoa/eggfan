@@ -9,10 +9,10 @@ For demonstration purposes we will now run a pipeline where we annotate genes in
 
 ## **Required files**
 ### Phylome orthology tables
-Non-collapsed orthology tables outputted from the phylome. They should be in a foder **containing only orthology tables**. If you just want to annotate few species you can keep a copy of those in a separate folder. They will not be overritten.
+Non-collapsed orthology tables outputted from the phylome. They should be in a foder **containing only orthology tables**. If you just want to annotate few species you can keep a copy of those in a separate folder. They will not be overritten. To try the pipeline you can use the files in test/data/phylomes
 
 ### Query list
-To run the pipeline, we need a list with human genes that represent all genes with the desired function in humans, in this case, a curated list with all human TFs. To do so, simply wright a text/tsv/csv file with a single line per gene. GeneIDs can be in either EnsemblID shape for the regular pipeline or HGNC (Genecards) format or the HGNC pipeline.
+To run the pipeline, we need a list with human genes that represent all genes with the desired function in humans, in this case, a curated list with all human TFs. To do so, simply wright a text/tsv/csv file with a single line per gene. GeneIDs can be in either EnsemblID shape for the regular pipeline or HGNC (Genecards) format or the HGNC pipeline. For Transcription Factors you can use test/data/TFs_Human_Ensembl.txt for the regular pipeline and test/data/TF_Human_HGNC.txt for the HGNC pipeline.
 
 
 ## **The pipeline**
@@ -46,7 +46,7 @@ If you are running the regular pipeline and you already have the orthology table
 1. **Make a lookup**
 If it's the first time running the pipeline first we have to make a lookup table to translate the orthology table(s) to ENSEMBLIDs. This procedure makes a lookup with the human genes that appear in the inputted tables. The recommended behaviour is saving the lookup table and the subsequent trandlations of the phylome. This way you avoid making them every time as it is quite time consuming.
 ```
->>> lookup = phylome.make_lookup("path/to/folder/with/orthology_tables")
+>>> lookup = phylome.make_lookup("test/data/phylomes/")
 ```
 > Alternatively you can make a lookup for a few or a single orthology table by specifying having only few species in the folder or putting a path to a single file. 
 > However, this is  not recommended
@@ -61,7 +61,7 @@ Alternatively you can not save it and continue with the pipeline
 3. **Translate orthology table(s)**
 Now you need to translate the orthology tables human orthologs from UniprotKB to ENSEMBL gene ID. To do so use the newly created lookup (or the one you saved, see [Import data](###import-data)) 
 ```
->>> translated_orthologies = phylome.translate_orthologies("path/to/phylome/orthology/tables", lookup)
+>>> translated_orthologies = phylome.translate_orthologies("test/data/phylomes/", lookup)
 ```
 You can also just input a path to a single orthology table.
 If you want to save these to be able to do multiuple annotations on them without running the translation again you can do so with the following code:
@@ -74,7 +74,7 @@ The last argument is the suffix. the name of output files will be taxID_suffix.t
 4. **Annotate genes**
 Finally to annotate genes simply use the translated tables and your human query (gene family/module).
 ```
->>> annotated_tables = phylome.find_query_orthologs("/path/to/query", translated_orthologies)
+>>> annotated_tables = phylome.find_query_orthologs("test/data/TFs_Human_Ensembl.txt", translated_orthologies)
 ```
 
 If you already had the translated tables you can just specify path to directory or file:
@@ -109,7 +109,7 @@ The final tables will show all genes in the original orthology table that have a
 This ipleine is simpler, faster and yields simmilar results than the regular pipeline. However the slight differences might be worth checking depending on the case.
 There is no need to translate or create a lookup table. Simply, using your query and the phylome you can run:
 ```
->>> annotated_tables = phylome.annotate_orthology_HGNC_method("path/to/query.txt", "path/to/orthology_tables/")
+>>> annotated_tables = phylome.annotate_orthology_HGNC_method("test/data/TF_Human_HGNC.txt", "test/data/phylomes/")
 ```
 Alternatively you can put a path to a single file.
 
@@ -119,8 +119,6 @@ Finally, save your annotated orthology tables with:
 ```
 The output is the same as with the regular method but without the ENSEMBL_ID and Ensembl_query-only columns.
 
-
-############################ Not like this anymore beloww VVVVV
 
 ### Command line
 To run the pipeline in command line you have the `python src/geneannotator/phylome_argparse.py` function. It works exactly the same as the pure python version, but in a single line.
@@ -132,7 +130,7 @@ python src/geneannotator/phylome_argparse.py -h
 
 You can run this single line:
 ```
-python src/geneannotator/phylome_argparse.py -t "path/to/phylome_tables/" -q "path/to/human_query.tsv" -o "saving/path/"
+python src/geneannotator/phylome_argparse.py -t "test/data/phylomes/" -q "test/data/TFs_Human_Ensembl.txt" -o "saving/path/"
 ```
 > Remember using `--suffix` if you want to change the name of the final output(s) (the final names will be taxID_suffix.tsv).
 This line will go through the following process:
@@ -158,7 +156,7 @@ This way you bypass making the lookup and translations aswell as saving them.
 ### **HGNC method**
 Much simpler than the regular method. It will use the already present in the orthology tables HGNCs to make the matchings. You only need your orthology table(s) and your query (in HGNC format), and then run:
 ```
-python src/geneannotator/phylome_argparse.py -t "path/to/phylome/orthology_tables/folder/" -q "path/to/human_query.tsv" -o "path/to/output/folder" --HGNC_method
+python src/geneannotator/phylome_argparse.py -t "test/data/phylomes" -q "test/data/TF_Human_HGNC" -o "path/to/output/folder" --HGNC_method
 ```
 The output are your annotated orthology tables but this time without the ENSEMBL translation columns.
 Remember using `--suffix` if you want to change the names of the outputs (the final names will be taxID_suffix.tsv).
