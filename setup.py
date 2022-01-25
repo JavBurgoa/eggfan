@@ -7,13 +7,13 @@ setuptools.setup(
     name="geneannotator-burgoa",
     version="0.0.1",
     author="Javier Burgoa",
-    author_email="author@example.com",
-    description="A small example package",
+    author_email="burgoacardasjavier@gmail.com",
+    description="A package for functional annotation of genes based on available public resources like emapper and EggNOG",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/pypa/sampleproject",
+    url="https://git.embl.de/burgoa/geneannotator.git",
     project_urls={
-        "Bug Tracker": "https://github.com/pypa/sampleproject/issues",
+        "Bug Tracker": "https://git.embl.de/burgoa/geneannotator/-/issues",
     },
     classifiers=[
         "Programming Language :: Python :: 3",
