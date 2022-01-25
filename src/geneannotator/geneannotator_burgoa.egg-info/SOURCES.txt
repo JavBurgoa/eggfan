@@ -1,0 +1,8 @@
+LICENSE
+README.md
+pyproject.toml
+setup.py
+geneannotator/geneannotator_burgoa.egg-info/PKG-INFO
+geneannotator/geneannotator_burgoa.egg-info/SOURCES.txt
+geneannotator/geneannotator_burgoa.egg-info/dependency_links.txt
+geneannotator/geneannotator_burgoa.egg-info/top_level.txt

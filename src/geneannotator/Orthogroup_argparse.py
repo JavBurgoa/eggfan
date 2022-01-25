@@ -5,7 +5,6 @@ import numpy as np
 
 
 def main(eggnog, lookup, query, emapper):
-    ## Run pipeline
     # translate eggnog Protein ENSEMBL IDs to whatever you want (default and recommended, ENSEMBL gene IDs)
     translated_eggnog = orthogroup.egg_translate(eggnog, lookup)
     # print("* Eggnog files read")
@@ -42,6 +41,8 @@ def main(eggnog, lookup, query, emapper):
 
     # Output
     print(annotated_genes.to_csv(sep="\t", index=False))
+
+
 
 
 ##### Arguments parser #####
