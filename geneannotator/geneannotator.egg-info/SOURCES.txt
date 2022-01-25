@@ -1,8 +1,0 @@
-LICENSE
-README.md
-pyproject.toml
-setup.py
-geneannotator/geneannotator.egg-info/PKG-INFO
-geneannotator/geneannotator.egg-info/SOURCES.txt
-geneannotator/geneannotator.egg-info/dependency_links.txt
-geneannotator/geneannotator.egg-info/top_level.txt
