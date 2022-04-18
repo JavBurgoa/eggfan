@@ -1,15 +1,16 @@
 # Geneannotator
-![Venn diagram](geneannotator.png "The three pipelines complementarity")
+![Venn diagram](eggfan.png "The three pipelines complementarity")
+<br></br>
 In v0.0.1 there are three separate but complementary pipelines to annotate the function of any gene/protein of your interest, using some publicly available resources. These resources are [Egggnog](http://eggnog5.embl.de/#/app/home), [emapper](http://eggnog-mapper.embl.de/) and the Phylome, all resources made and mantained by the Jaime Huerta Cepas lab in the CBGP unit of Universidad Politécnica de Madrid.
 
 If you want to know more about each pipeline, check out the vignettes in the github repository.
 
 # Installation
 
-## pip install
+## pip install (**Not ready!**)
 The easiest way is just running on your terminal
 ```
-pip install geneannotator
+pip install eggfan
 ```
 
 ## Manual installation
@@ -22,6 +23,6 @@ conda create -n geneannotator -c conda-forge python=3.7 pip pandas numpy
 Install geneannotator
 ```
 git clone https://git.embl.de/burgoa/geneannotator.git 
-cd geneannotator
+cd eggfan
 pip install .
 ```
