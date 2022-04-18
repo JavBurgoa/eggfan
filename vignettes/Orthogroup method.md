@@ -54,7 +54,7 @@ To do so follow the README.md file in our GitLab repository
 ### Import modules
 On the top of your file put the required dependencies:
 ```
->>> from genenannotator import orthogroup
+>>> from eggfan import orthogroup
 >>> import pandas as pd
 ```
 
@@ -64,7 +64,7 @@ First we need to load all data we mentioned in the [Required data](##required-fi
 1. **Eggnog datasets**
 For this we have a function called read_eggnog, that allows you to import as many tax levels as you decide. Simply add as arguments a path for every (de-compressed) eggnog file you have. Remember that if you have more than one eggnog file the path should come inside of a list [].
 ```
->>> eggnog = read_eggnog(['/path/to/Eggnog_Bilateria(33213)_members.tsv', '/path/to/Eggnog_Metazoa(33208)_members.tsv'])
+>>> eggnog = read_eggnog(['tests/data/eggnog/Eggnog_Bilateria(33213)_members.tsv', 'tests/data/eggnog/Eggnog_Metazoa(33208)_members.tsv'])
 ```
 
 2. **Lookup table**
@@ -132,7 +132,7 @@ If we combine that with the emapper output we can know which of the *Capitella* 
 
 annotated_genes contains a table with all *Capitella* genes that are putative TFs, based on your list of Human TFs and the taxonomic levels chosen at Eggnog. You can save this file as a tab separated file with the following code:
 ```
->>> annotated_genes.to_csv("/g/arendt/Javier/Python/geneannotator/tests/Ortho_method_Capitella_TFs.tsv", sep = "\t")
+>>> annotated_genes.to_csv("/g/arendt/Javier/Python/eggfan/tests/Ortho_method_Capitella_TFs.tsv", sep = "\t")
 ```
 
 &nbsp;
@@ -144,7 +144,7 @@ However, you will need to activate python in your commandline. You can check if 
 
 You can see all options in the command line orthogroup function simply with
 ```
-python src/geneannotator/orthogroup_argparse.py -h
+python src/eggfan/orthogroup_argparse.py -h
 ```
 
 #### Run pipeline
@@ -163,7 +163,7 @@ Name of the column from the lookup table with the ID format in which your query 
 With this information you can now run the pipeline from command line. Here is an example usage for the abe example as with thepython version: Which genes in the *Capitella* *teleta* genome are transcription factors (TFs).
 
 ```
-python geneannotator/Orthogroup_argparse.py -g '/path/to/Eggnog_Bilateria(33213)_members.tsv' -g '/path/to/Eggnog_Metazoa(33208)_members.tsv' -l 'test/data/lookup.txt' -e "test/data/Capitella_emapper_redux.txt" -q "test/data/TF_Human_Ensembl.txt" -m "Gene stable ID"
+python eggfan/Orthogroup_argparse.py -g 'tests/data/eggnog/Eggnog_Bilateria(33213)_members.tsv' -g 'tests/data/eggnog/Eggnog_Metazoa(33208)_members.tsv' -l 'test/data/lookup.txt' -e "test/data/Capitella_emapper_redux.txt" -q "test/data/TF_Human_Ensembl.txt" -m "Gene stable ID"
 ```
 This will output a dataframe with all of your emapper genes that share orthogroup with your human query genes and their respective translations. the same functionality than the python version, but in a single line of code.
 

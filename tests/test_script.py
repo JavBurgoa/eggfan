@@ -1,20 +1,20 @@
-from geneannotator import phylome
-from geneannotator import goterms
-from geneannotator import orthogroup
+from eggfan import phylome
+from eggfan import goterms
+from eggfan import orthogroup
 import pandas as pd
 
 # GOTerms
-cap_annotated = goterms.GOTerms_annotation("/g/arendt/Javier/Python/TF_annot_methods/Capitella_teleta/Data/Capitella_teleta_Gene_emapper_annotations.txt", GOterm="GO:0003700")
+cap_annotated = goterms.GOTerms_annotation("tests/data/Capitella_emapper_redux.txt", GOterm="GO:0003700")
 print(cap_annotated)
 exit()
 
 
 # Orthogroup
 
-eggnog = orthogroup.read_eggnog(['/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Eggnog_Bilateria(33213)_members.tsv', '/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Eggnog_Metazoa(33208)_members.tsv'])
-lookup = pd.read_csv('/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/Biomart_Lookup_Prot-HGNC-Gen_Translate_Updated.txt', sep='\t')
-query = pd.read_csv("/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/TFs_Ensembl_v_1.01.txt", sep = "\t")
-emapper = pd.read_csv("/g/arendt/Javier/Python/TF_annot_methods/Capitella_teleta/Data/Capitella_teleta_Prot_emapper_annotations.txt", skiprows=4, sep="\t")
+eggnog = orthogroup.read_eggnog(['tests/data/eggnog/Eggnog_Bilateria(33213)_members.tsv', 'tests/data/eggnog/Eggnog_Metazoa(33208)_members.tsv'])
+lookup = pd.read_csv('tests/data/eggnog/lookup.txt', sep='\t')
+query = pd.read_csv("tests/data/TFs_Human_Ensembl.txt", sep = "\t")
+emapper = pd.read_csv("tests/data/Capitella_emapper_redux.txt", skiprows=4, sep="\t")
 
 translated_eggnog = orthogroup.egg_translate(eggnog, lookup)
 orthogroup.translated_QC(translated_eggnog)
@@ -29,23 +29,23 @@ annotated_genes = orthogroup.emapper_annotation(emapper, query_orthogroups, keep
 
 lookup = phylome.make_lookup("tests/7227_orthologs_redux_1000.tsv")
 print(lookup)
-lookup = pd.read_csv("/g/arendt/Javier/Python/test_geneannot/geneannotator/tests/test1/lookup.tsv", sep = "\t")
+lookup = pd.read_csv("tests/data/lookup.tsv", sep = "\t")
 print(lookup)
 
-translated_orthologies = phylome.translate_orthologies("/g/arendt/data/phylomeV2/orthology_tables_nocollapse/7955_orthologs.tsv", lookup)
+translated_orthologies = phylome.translate_orthologies("tests/data/phylomes/7955_Zebrafish_orthologos_redux.tsv", lookup)
 
 print(translated_orthologies)
 
-phylome.save_annotated(translated_orthologies, "tests/test3", suffix = "_translated")
+phylome.save_annotated(translated_orthologies, "tests/data/translated_orthotables/", suffix = "_translated")
 
-annotated_tables = phylome.find_query_orthologs("/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/TFs_Ensembl_v_1.01.txt", translated_orthologies)
+annotated_tables = phylome.find_query_orthologs("tests/data/TFs_Human_Ensembl.txt", translated_orthologies)
 
-phylome.save_annotated(annotated_tables, "tests/test2/")
+phylome.save_annotated(annotated_tables, "tests/results/")
 
 
 ## Phylome HGNC version
 
 
-annotated_tables = phylome.annotate_orthology_HGNC_method("/g/arendt/Javier/Python/Human_TF_Orthogroups/TF_Data/TF_names_v_1.01.txt", "/g/arendt/Javier/Python/geneannotator/tests/translated_orthotables/")
-phylome.save_annotated(annotated_tables, "/g/arendt/Javier/Python/geneannotator/tests/")
+annotated_tables = phylome.annotate_orthology_HGNC_method("tests/data/TF_Human_HGNC.txt", "tests/data/translated_orthotables/")
+phylome.save_annotated(annotated_tables, "tests/results/")
 

@@ -26,7 +26,7 @@ To do so follow the README.md file in our GitLab repository
 ### Import modules
 For this pipeline you don't need to import any file. Just open your script, and import the following packages
 ```
->>> from geneannotator import phylome
+>>> from eggfan import phylome
 >>> import pandas as pd
 ```
 
@@ -35,7 +35,7 @@ You don't need to import any data if it's the first time you are running the pip
 If however you have already run the pipeline before and you have a lookup table you can just import it with:
 
 ```
->>> lookup = pd.read_csv("path/to/lookup.tsv", sep = "\t", keep_default_na=False)
+>>> lookup = pd.read_csv("tests/data/lookup.tsv", sep = "\t", keep_default_na=False)
 ```
 
 If you are running the regular pipeline and you already have the orthology tables translated to ENSEMBLID we will see later how to use them.
@@ -54,39 +54,39 @@ If it's the first time running the pipeline first we have to make a lookup table
 2. **Save the lookup**
 Now you can save the lookup table like:
 ```
->>> lookup.to_csv("save/path/lookup.txt, sep = "\t", index = False)
+>>> lookup.to_csv("tetst/results/lookup.txt, sep = "\t", index = False)
 ```
 Alternatively you can not save it and continue with the pipeline
 
 3. **Translate orthology table(s)**
 Now you need to translate the orthology tables human orthologs from UniprotKB to ENSEMBL gene ID. To do so use the newly created lookup (or the one you saved, see [Import data](###import-data)) 
 ```
->>> translated_orthologies = phylome.translate_orthologies("test/data/phylomes/", lookup)
+>>> translated_orthologies = phylome.translate_orthologies("tests/data/phylomes/", lookup)
 ```
 You can also just input a path to a single orthology table.
 If you want to save these to be able to do multiuple annotations on them without running the translation again you can do so with the following code:
 
 ```
->>> phylome.save_annotated(translated_orthologies, "output/directory/", suffix = "_translated")
+>>> phylome.save_annotated(translated_orthologies, "tests/results/translated/", suffix = "_translated")
 ```
 The last argument is the suffix. the name of output files will be taxID_suffix.tsv. You can change the suffix by changing that parameter.
 
 4. **Annotate genes**
 Finally to annotate genes simply use the translated tables and your human query (gene family/module).
 ```
->>> annotated_tables = phylome.find_query_orthologs("test/data/TFs_Human_Ensembl.txt", translated_orthologies)
+>>> annotated_tables = phylome.find_query_orthologs("tests/data/TFs_Human_Ensembl.txt", translated_orthologies)
 ```
 
 If you already had the translated tables you can just specify path to directory or file:
 ```
->>> annotated_tables = phylome.find_query_orthologs("/path/to/query", "path/to/translated_orthologies")
+>>> annotated_tables = phylome.find_query_orthologs("tests/data/TFs_Human_Ensembl.txt", "tests/results/translated/")
 ```
 
 5. **Save annotated tables**
 annotate_files is a list containing all your annotated datasets. To save them (recommended) use the following function:
 
 ```
->>> phylome.save_annotated(annotated_tables, "/path/to/saving/folder/")
+>>> phylome.save_annotated(annotated_tables, "tests/results")
 ```
 Name of the output files will be taxID_annotated_orthology.tsv. You can change the "annotated_orthology" suffix with the `suffix` parameter.
 
@@ -109,28 +109,28 @@ The final tables will show all genes in the original orthology table that have a
 This ipleine is simpler, faster and yields simmilar results than the regular pipeline. However the slight differences might be worth checking depending on the case.
 There is no need to translate or create a lookup table. Simply, using your query and the phylome you can run:
 ```
->>> annotated_tables = phylome.annotate_orthology_HGNC_method("test/data/TF_Human_HGNC.txt", "test/data/phylomes/")
+>>> annotated_tables = phylome.annotate_orthology_HGNC_method("tests/data/TF_Human_HGNC.txt", "tests/data/phylomes/")
 ```
 Alternatively you can put a path to a single file.
 
 Finally, save your annotated orthology tables with:
 ```
->>> phylome.save_annotated(annotated_tables, "/path/to/saving/folder/")
+>>> phylome.save_annotated(annotated_tables, "tests/results/")
 ```
 The output is the same as with the regular method but without the ENSEMBL_ID and Ensembl_query-only columns.
 
 
 ### Command line
-To run the pipeline in command line you have the `python src/geneannotator/phylome_argparse.py` function. It works exactly the same as the pure python version, but in a single line.
+To run the pipeline in command line you have the `python src/eggfan/phylome_argparse.py` function. It works exactly the same as the pure python version, but in a single line.
 
 If you want to know what each flag does, just run on your terminal:
 ```
-python src/geneannotator/phylome_argparse.py -h
+python src/eggfan/phylome_argparse.py -h
 ```
 
 You can run this single line:
 ```
-python src/geneannotator/phylome_argparse.py -t "test/data/phylomes/" -q "test/data/TFs_Human_Ensembl.txt" -o "saving/path/"
+python src/eggfan/phylome_argparse.py -t "tests/data/phylomes/" -q "tests/data/TFs_Human_Ensembl.txt" -o "tests/results"
 ```
 > Remember using `--suffix` if you want to change the name of the final output(s) (the final names will be taxID_suffix.tsv).
 This line will go through the following process:
@@ -148,7 +148,7 @@ Finally, it goes over the translated tables and annotates the genes based on ort
 ### Re-running with a different query
 You may want to annotate the same species with a different module. In that case you don't need to run the whole pipeline again. You can specify that you already have the translated tables with the `--input_translated`:
 ```
-python src/geneannotator/phylome_argparse.py -t "path/to/translated_orthology_tables/" -q "path/to/human_query.tsv" -o "saving/path/" --input_translated
+python src/eggfan/phylome_argparse.py -t "tests/results/translated/" -q "path/to/human_query.tsv" -o "saving/path/" --input_translated
 ```
 This way you bypass making the lookup and translations aswell as saving them.
 
@@ -156,7 +156,7 @@ This way you bypass making the lookup and translations aswell as saving them.
 ### **HGNC method**
 Much simpler than the regular method. It will use the already present in the orthology tables HGNCs to make the matchings. You only need your orthology table(s) and your query (in HGNC format), and then run:
 ```
-python src/geneannotator/phylome_argparse.py -t "test/data/phylomes" -q "test/data/TF_Human_HGNC" -o "path/to/output/folder" --HGNC_method
+python src/eggfan/phylome_argparse.py -t "tests/data/phylomes" -q "test/data/TF_Human_HGNC" -o "tests/results" --HGNC_method
 ```
 The output are your annotated orthology tables but this time without the ENSEMBL translation columns.
 Remember using `--suffix` if you want to change the names of the outputs (the final names will be taxID_suffix.tsv).

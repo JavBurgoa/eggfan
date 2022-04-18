@@ -29,7 +29,7 @@ To do so follow the README.md file in our GitLab repository
 ### Import modules
 For this pipeline you don't need to import any file. Just open your script, and import the following packages
 ```
->>> from geneannotator import goterms
+>>> from eggfan import goterms
 ```
 
 ### Run pipeline
@@ -54,7 +54,7 @@ Finally if you wish to keep all columns from emapper output you can use the flag
 ### **Command line**
 You can see all options in the command line orthogroup function simply with
 ```
-python src/geneannotator/goterms_argparse.py -h
+python src/eggfan/goterms_argparse.py -h
 ```
 
 
@@ -68,12 +68,12 @@ Goterm code you want to search in the emapper output.
 Simply run the pipeline like so:
 
 ```
-python geneannotator/goterms_argparse.py -e /test/data/Capitella_emapper_redux.txt -g "GO:0003700"
+python eggfan/goterms_argparse.py -e /test/data/Capitella_emapper_redux.txt -g "GO:0003700"
 ```
 This outputs a list with all the genes/proteins in yout emapper that contain the specified GO:Term.
 There are some extra flags that modify the output. `-x` allows you to input emapper column names you would like to see in the output. For example if you also want to see the other GO:terms and eggnog Orthogroups yo can run:
 
 ```
-python geneannotator/goterms_argparse.py -e "/test/data/Capitella_emapper_redux.txt" -g "GO:0003700" -x"GOs" -x"eggNOG_OGs"
+python eggfan/goterms_argparse.py -e "/test/data/Capitella_emapper_redux.txt" -g "GO:0003700" -x"GOs" -x"eggNOG_OGs"
 ```
 Additionally with the `--keep_all_columns` flag you can keep all emapper output columns.
